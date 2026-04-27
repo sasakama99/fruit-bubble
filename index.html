@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>フルーツバブル</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: linear-gradient(135deg, #C9A0DC 0%, #E8A0C0 50%, #F4B8D0 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #game-container canvas { display: block; }
+  </style>
+</head>
+<body>
+  <div id="game-container"></div>
+
+  <!-- GameMonetize SDK（登録後に取得した Game ID を YOUR_GAME_ID に入れる） -->
+  <script>
+    window.SDK_OPTIONS = {
+      gameId: 'bq5jxgqtpkntz3g87gc4h1qmd0vcsqza',
+      onEvent: function(event) {
+        switch (event.name) {
+          case 'SDK_GAME_PAUSE':
+            // 広告再生中：BGM をミュート＆ゲームを一時停止
+            if (window._gdGame) {
+              window._gdGame.sound.setMute(true);
+            }
+            break;
+          case 'SDK_GAME_START':
+            // 広告終了後：ミュート解除
+            if (window._gdGame) {
+              var soundOn = localStorage.getItem('fruitBubbleSound') !== 'off';
+              window._gdGame.sound.setMute(!soundOn);
+            }
+            break;
+          case 'SDK_READY':
+            // SDK準備完了
+            break;
+        }
+      },
+    };
+    (function(a, b, c) {
+      var d = a.getElementsByTagName(b)[0];
+      a.getElementById(c) || (a = a.createElement(b), a.id = c,
+        a.src = 'https://api.gamemonetize.com/sdk.js',
+        d.parentNode.insertBefore(a, d));
+    })(document, 'script', 'gamemonetize-sdk');
+  </script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
+  <script src="scenes/lang.js?v=4"></script>
+  <script src="scenes/BadgeSystem.js?v=1"></script>
+  <script src="scenes/GameScene.js?v=27"></script>
+  <script src="scenes/UIScene.js?v=15"></script>
+  <script src="scenes/GameOverScene.js?v=19"></script>
+  <script src="game.js?v=9"></script>
+</body>
+</html>
