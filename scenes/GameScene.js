@@ -358,9 +358,13 @@ class GameScene extends Phaser.Scene {
     const feverMult  = this.feverMode ? 2 : 1;
     let totalScore   = 0;
 
+    const bigExplosions = []; // Lv6以上の爆発消滅リスト
+
     for (const m of matches) {
-      const newLevel = Math.min(m.level + 1, 8);
-      const addScore = FRUITS[newLevel - 1].score * this.combo * feverMult;
+      const newLevel  = Math.min(m.level + 1, 8);
+      const isBoom    = m.level >= 6;          // Lv6・7→爆発消滅
+      const scoreMult = isBoom ? 3 : 1;        // 爆発時はスコア3倍ボーナス
+      const addScore  = FRUITS[newLevel - 1].score * this.combo * feverMult * scoreMult;
       totalScore += addScore;
 
       if (m.type === 'h') {
@@ -368,26 +372,29 @@ class GameScene extends Phaser.Scene {
           removeSet.add(`${c},${m.row}`);
         }
         const centerCol = m.startCol + Math.floor(m.count / 2);
-        (insertions[centerCol] = insertions[centerCol] || []).push(
-          { kind: 'top', level: newLevel }
-        );
-        popups.push({
-          x: this._laneX(centerCol),
-          y: this._rowY(m.row),
-          score: addScore,
-        });
+        const px = this._laneX(centerCol), py = this._rowY(m.row);
+        if (isBoom) {
+          bigExplosions.push({ x: px, y: py, level: m.level });
+        } else {
+          (insertions[centerCol] = insertions[centerCol] || []).push(
+            { kind: 'top', level: newLevel }
+          );
+        }
+        popups.push({ x: px, y: py, score: addScore });
       } else {
         for (let r = m.startRow; r < m.startRow + m.count; r++) {
           removeSet.add(`${m.col},${r}`);
         }
-        (insertions[m.col] = insertions[m.col] || []).push(
-          { kind: 'at', row: m.startRow, level: newLevel }
-        );
-        popups.push({
-          x: this._laneX(m.col),
-          y: this._rowY(m.startRow + Math.floor(m.count / 2)),
-          score: addScore,
-        });
+        const px = this._laneX(m.col);
+        const py = this._rowY(m.startRow + Math.floor(m.count / 2));
+        if (isBoom) {
+          bigExplosions.push({ x: px, y: py, level: m.level });
+        } else {
+          (insertions[m.col] = insertions[m.col] || []).push(
+            { kind: 'at', row: m.startRow, level: newLevel }
+          );
+        }
+        popups.push({ x: px, y: py, score: addScore });
       }
     }
 
@@ -474,6 +481,13 @@ class GameScene extends Phaser.Scene {
           }
         });
 
+        // Lv6・7爆発エフェクト
+        bigExplosions.forEach(e => this._bigExplosion(e.x, e.y, e.level));
+        // Lv7（スイカ）合体 → フィーバー発動
+        if (bigExplosions.some(e => e.level >= 7) && !this.feverMode) {
+          this.time.delayedCall(300, () => this._startFever());
+        }
+
         this._updateUI();
         this._packAllColumns(true);
 
@@ -492,6 +506,77 @@ class GameScene extends Phaser.Scene {
           this.time.delayedCall(240, onDone);
         });
       },
+    });
+  }
+
+  // ============================================================
+  //  Lv6・7合体 → 大爆発消滅エフェクト
+  // ============================================================
+  _bigExplosion(x, y, level) {
+    // パーティクル用テクスチャ（なければ作成）
+    if (!this.textures.exists('boomParticle')) {
+      const g = this.make.graphics({ add: false });
+      g.fillStyle(0xFFFFFF); g.fillCircle(8, 8, 8);
+      g.generateTexture('boomParticle', 16, 16); g.destroy();
+    }
+
+    // ── ① 衝撃波リング（外に広がる円）
+    const ring = this.add.graphics().setDepth(48);
+    ring.lineStyle(6, level >= 7 ? 0xFF4400 : 0xFFAA00, 1);
+    ring.strokeCircle(x, y, 10);
+    this.tweens.add({
+      targets: ring,
+      scaleX: 5, scaleY: 5, alpha: 0,
+      duration: 500, ease: 'Quad.easeOut',
+      onComplete: () => ring.destroy(),
+    });
+
+    // ── ② 黄白フラッシュ
+    const flash = this.add.rectangle(GAME_W/2, GAME_H/2, GAME_W, GAME_H,
+      level >= 7 ? 0xFF6600 : 0xFFDD00, 0).setDepth(55);
+    this.tweens.add({
+      targets: flash, alpha: { from: 0.65, to: 0 },
+      duration: 400, ease: 'Quad.easeOut',
+      onComplete: () => flash.destroy(),
+    });
+
+    // ── ③ カメラシェイク（Lv7はより強め）
+    this.cameras.main.shake(level >= 7 ? 450 : 280, level >= 7 ? 0.018 : 0.010);
+
+    // ── ④ 大量パーティクルバースト
+    const colors = level >= 7
+      ? [0xFF2200, 0xFF6600, 0xFFAA00, 0xFFFF00, 0xFF0088]
+      : [0xFFAA00, 0xFFDD00, 0xFFFFAA, 0xFF8800, 0xFF5500];
+    colors.forEach((tint, i) => {
+      const angle = (i / colors.length) * 360;
+      const em = this.add.particles(x, y, 'boomParticle', {
+        speed: { min: 200, max: 500 },
+        angle: { min: angle - 36, max: angle + 36 },
+        lifespan: 800, scale: { start: 1.2, end: 0 },
+        alpha: { start: 1, end: 0 }, tint, quantity: 8,
+        emitting: false,
+      }).setDepth(50);
+      em.explode(8);
+      this.time.delayedCall(1000, () => { if (em && em.scene) em.destroy(); });
+    });
+
+    // ── ⑤ 「SUPER!!」 or「AMAZING!!」テキスト
+    const label = level >= 7 ? '🌟 AMAZING!! 🌟' : '💥 SUPER!! 💥';
+    const col   = level >= 7 ? '#FF4400' : '#FFAA00';
+    const boom  = this.add.text(x, y, label, {
+      fontSize: '38px', fontFamily: 'Arial Black',
+      color: col, stroke: '#fff', strokeThickness: 6,
+      shadow: { offsetX: 3, offsetY: 3, color: '#000', blur: 6, fill: true },
+    }).setOrigin(0.5).setDepth(52).setScale(0.3).setAlpha(0);
+    this.tweens.add({
+      targets: boom, alpha: 1, scaleX: 1.1, scaleY: 1.1,
+      duration: 300, ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: boom, alpha: 0, y: y - 80, duration: 600, delay: 400,
+          ease: 'Quad.easeIn', onComplete: () => boom.destroy(),
+        });
+      }
     });
   }
 
