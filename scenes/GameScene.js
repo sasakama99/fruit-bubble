@@ -1131,8 +1131,17 @@ class GameScene extends Phaser.Scene {
 
       // GameMonetize インタースティシャル（全画面広告）
       // 広告が終わったコールバックで GameOverScene を起動
+      // GameMonetize 外（GitHub Pages等）ではコールバックが返らないため
+      // 3秒のタイムアウトフォールバックを設ける
       if (typeof sdk !== 'undefined' && sdk.showInterstitial) {
-        sdk.showInterstitial(showGameOver);
+        let launched = false;
+        const safeShow = () => {
+          if (launched) return;
+          launched = true;
+          showGameOver();
+        };
+        sdk.showInterstitial(safeShow);
+        this.time.delayedCall(3000, safeShow); // 3秒後に強制起動
       } else {
         showGameOver();
       }
