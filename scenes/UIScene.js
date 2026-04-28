@@ -355,25 +355,27 @@ class UIScene extends Phaser.Scene {
     const overlay = this.add.rectangle(240, 360, 480, 720, 0x000000, 0.55)
       .setDepth(60).setInteractive();
 
-    // パネル
-    const panelH = 480;
-    const panel = this.add.rectangle(240, 360, 320, panelH, 0xFFF0F8, 1)
+    // パネル（項目数に合わせて高さを自動計算）
+    const stepH  = 56;
+    const itemCount = tx.howToPlay.length;
+    const panelH = 80 + itemCount * stepH + 54; // ヘッダー80 + 項目 + 閉じるボタン54
+    const panelY = Math.min(360, 720 - panelH / 2 - 10); // 画面下に収まるよう調整
+    const panel = this.add.rectangle(240, panelY, 320, panelH, 0xFFF0F8, 1)
       .setStrokeStyle(3, 0xFF8FB8).setDepth(61);
 
     // タイトル
-    const title = this.add.text(240, 360 - panelH/2 + 32, tx.helpTitle, {
+    const title = this.add.text(240, panelY - panelH/2 + 32, tx.helpTitle, {
       fontSize: '20px', fontFamily: 'Arial',
       color: '#A0397A', stroke: '#fff', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(62);
 
     // 区切り線
-    const line = this.add.rectangle(240, 360 - panelH/2 + 54, 280, 2, 0xFFB0D0, 1)
+    const line = this.add.rectangle(240, panelY - panelH/2 + 54, 280, 2, 0xFFB0D0, 1)
       .setOrigin(0.5, 0).setDepth(62);
 
     // 各ステップを描画
     const items = [];
-    const startY = 360 - panelH/2 + 72;
-    const stepH  = 64;
+    const startY = panelY - panelH/2 + 70;
     tx.howToPlay.forEach((text, i) => {
       const t = this.add.text(100, startY + i * stepH, text, {
         fontSize: '13px', fontFamily: 'Arial',
@@ -382,16 +384,16 @@ class UIScene extends Phaser.Scene {
       }).setOrigin(0, 0).setDepth(62);
 
       // 吹き出し風の背景（奇偶で色を交互に）
-      const bg = this.add.rectangle(240, startY + i * stepH + 18, 286, 52,
+      const bg = this.add.rectangle(240, startY + i * stepH + 16, 286, 48,
         i % 2 === 0 ? 0xFFE4F4 : 0xFFF5FA, 1)
         .setStrokeStyle(1, 0xFFCCE8).setDepth(61).setOrigin(0.5);
       items.push(bg, t);
     });
 
     // 閉じるボタン
-    const closeBox = this.add.rectangle(240, 360 + panelH/2 - 30, 160, 40, 0xFF8FB8, 1)
+    const closeBox = this.add.rectangle(240, panelY + panelH/2 - 28, 160, 40, 0xFF8FB8, 1)
       .setStrokeStyle(2, 0xFF6B9D).setInteractive({ cursor: 'pointer' }).setDepth(62);
-    const closeTxt = this.add.text(240, 360 + panelH/2 - 30, tx.helpClose, {
+    const closeTxt = this.add.text(240, panelY + panelH/2 - 28, tx.helpClose, {
       fontSize: '16px', fontFamily: 'Arial',
       color: '#fff', stroke: '#C0006A', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(63);
