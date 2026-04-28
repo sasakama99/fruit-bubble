@@ -66,6 +66,17 @@ class UIScene extends Phaser.Scene {
     this.helpBtnText.on('pointerout',  () => this.helpBtnText.setStyle({ color: '#C06090' }));
     this.helpBtnText.on('pointerdown', () => this._showHelp());
 
+    // ── 設定ボタン（ヘルプの右隣）
+    this.settingsBtnText = this.add.text(202, 74, tx.settingsBtn, {
+      fontSize: '13px', fontFamily: 'Arial',
+      color: '#C06090', stroke: '#fff', strokeThickness: 1,
+      backgroundColor: '#FFE4EE',
+      padding: { x: 6, y: 2 },
+    }).setInteractive({ cursor: 'pointer' });
+    this.settingsBtnText.on('pointerover', () => this.settingsBtnText.setStyle({ color: '#FF6BAE' }));
+    this.settingsBtnText.on('pointerout',  () => this.settingsBtnText.setStyle({ color: '#C06090' }));
+    this.settingsBtnText.on('pointerdown', () => this._showSettings());
+
     // ── NEXT ラベル
     this.nextLabel = this.add.text(370, 12, tx.next, {
       fontSize: '13px', fontFamily: 'Arial',
@@ -511,5 +522,187 @@ class UIScene extends Phaser.Scene {
     localStorage.setItem('fruitBubbleSound', this.soundOn ? 'on' : 'off');
     this.soundLabel.setText(this.soundOn ? '♪' : '✕');
     this.sound.setMute(!this.soundOn);
+  }
+
+  // ============================================================
+  //  設定パネル（リセット系）
+  // ============================================================
+  _showSettings() {
+    const tx = window.t();
+    const gs = this.scene.get('GameScene');
+    if (gs && gs.scene.isActive()) gs.scene.pause();
+
+    const cx = 240, cy = 360;
+
+    // 暗幕
+    const overlay = this.add.rectangle(cx, cy, 480, 720, 0x000000, 0.55)
+      .setDepth(70).setInteractive();
+
+    // パネル
+    const panel = this.add.rectangle(cx, cy, 300, 230, 0xFFF0F8, 1)
+      .setStrokeStyle(3, 0xFF8FB8).setDepth(71);
+
+    // タイトル
+    const title = this.add.text(cx, cy - 90, tx.settingsTitle, {
+      fontSize: '18px', fontFamily: 'Arial',
+      color: '#A0397A', stroke: '#fff', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(72);
+
+    // 注意文言
+    const note = this.add.text(cx, cy - 60, '⚠ リセットは取り消せません', {
+      fontSize: '11px', fontFamily: 'Arial',
+      color: '#999',
+    }).setOrigin(0.5).setDepth(72);
+
+    // ── ベストスコアリセットボタン
+    const bestBtn = this.add.rectangle(cx, cy - 18, 240, 46, 0xFFE0E0, 1)
+      .setStrokeStyle(2, 0xFFAAAA).setInteractive({ cursor: 'pointer' }).setDepth(72);
+    const bestTxt = this.add.text(cx, cy - 18, tx.resetBestBtn, {
+      fontSize: '14px', fontFamily: 'Arial',
+      color: '#C0392B', stroke: '#fff', strokeThickness: 1,
+    }).setOrigin(0.5).setDepth(73);
+    bestBtn.on('pointerover', () => bestBtn.setFillStyle(0xFFCCCC));
+    bestBtn.on('pointerout',  () => bestBtn.setFillStyle(0xFFE0E0));
+    bestBtn.on('pointerdown', () => {
+      this._showResetConfirm(
+        tx.resetBestBtn,
+        () => {
+          localStorage.removeItem('fruitBubbleBest');
+          this.bestScore = 0;
+          this.bestText.setText(`${tx.best}: 0`);
+          _showDone(tx.resetDone);
+        },
+        allObjs
+      );
+    });
+
+    // ── バッジリセットボタン
+    const badgeBtn = this.add.rectangle(cx, cy + 40, 240, 46, 0xFFE0E0, 1)
+      .setStrokeStyle(2, 0xFFAAAA).setInteractive({ cursor: 'pointer' }).setDepth(72);
+    const badgeTxt = this.add.text(cx, cy + 40, tx.resetBadgesBtn, {
+      fontSize: '14px', fontFamily: 'Arial',
+      color: '#C0392B', stroke: '#fff', strokeThickness: 1,
+    }).setOrigin(0.5).setDepth(73);
+    badgeBtn.on('pointerover', () => badgeBtn.setFillStyle(0xFFCCCC));
+    badgeBtn.on('pointerout',  () => badgeBtn.setFillStyle(0xFFE0E0));
+    badgeBtn.on('pointerdown', () => {
+      this._showResetConfirm(
+        tx.resetBadgesBtn,
+        () => {
+          localStorage.removeItem('fruitBubbleBadges');
+          if (window.BadgeManager && window.BadgeManager.reset) window.BadgeManager.reset();
+          _showDone(tx.resetDone);
+        },
+        allObjs
+      );
+    });
+
+    // 閉じるボタン
+    const closeBtn = this.add.rectangle(cx, cy + 95, 120, 36, 0xDDDDDD, 1)
+      .setStrokeStyle(2, 0xBBBBBB).setInteractive({ cursor: 'pointer' }).setDepth(72);
+    const closeTxt = this.add.text(cx, cy + 95, tx.settingsClose, {
+      fontSize: '14px', fontFamily: 'Arial',
+      color: '#555', stroke: '#fff', strokeThickness: 1,
+    }).setOrigin(0.5).setDepth(73);
+    closeBtn.on('pointerover', () => closeBtn.setFillStyle(0xCCCCCC));
+    closeBtn.on('pointerout',  () => closeBtn.setFillStyle(0xDDDDDD));
+
+    const allObjs = [overlay, panel, title, note,
+                     bestBtn, bestTxt, badgeBtn, badgeTxt, closeBtn, closeTxt];
+
+    const _close = () => {
+      this.tweens.add({
+        targets: allObjs, alpha: 0, duration: 200,
+        onComplete: () => {
+          allObjs.forEach(o => { if (o && o.scene) o.destroy(); });
+          if (gs && gs.scene) gs.scene.resume();
+        },
+      });
+    };
+    closeBtn.on('pointerdown', _close);
+    overlay.on('pointerdown', _close);
+
+    // 完了メッセージ（一時的に表示）
+    const _showDone = (msg) => {
+      const done = this.add.text(cx, cy - 60, `✅ ${msg}`, {
+        fontSize: '13px', fontFamily: 'Arial',
+        color: '#27AE60', stroke: '#fff', strokeThickness: 2,
+      }).setOrigin(0.5).setDepth(75).setAlpha(0);
+      note.setAlpha(0);
+      this.tweens.add({
+        targets: done, alpha: 1, duration: 200,
+        onComplete: () => {
+          this.time.delayedCall(1500, () => {
+            this.tweens.add({
+              targets: done, alpha: 0, duration: 300,
+              onComplete: () => { if (done && done.scene) done.destroy(); note.setAlpha(1); },
+            });
+          });
+        },
+      });
+    };
+
+    allObjs.forEach(o => o.setAlpha(0));
+    this.tweens.add({ targets: allObjs, alpha: 1, duration: 200 });
+  }
+
+  // リセット確認ダイアログ（2段階目）
+  _showResetConfirm(label, onConfirm, parentObjs) {
+    const tx = window.t();
+    const cx = 240, cy = 360;
+
+    // 親パネルを一時的に操作不能に
+    parentObjs.forEach(o => { if (o.disableInteractive) o.disableInteractive(); });
+
+    // 確認パネル
+    const overlay2 = this.add.rectangle(cx, cy, 480, 720, 0x000000, 0.35)
+      .setDepth(80).setInteractive();
+    const panel2 = this.add.rectangle(cx, cy, 280, 180, 0xFFF8F8, 1)
+      .setStrokeStyle(3, 0xFF6666).setDepth(81);
+    const msg = this.add.text(cx, cy - 44, tx.resetConfirm(label), {
+      fontSize: '14px', fontFamily: 'Arial',
+      color: '#C0392B', stroke: '#fff', strokeThickness: 1,
+      align: 'center',
+    }).setOrigin(0.5).setDepth(82);
+
+    // 「リセットする」（赤・左）
+    const yesBtn = this.add.rectangle(cx - 64, cy + 46, 110, 40, 0xFF4444, 1)
+      .setStrokeStyle(2, 0xCC0000).setInteractive({ cursor: 'pointer' }).setDepth(82);
+    const yesTxt = this.add.text(cx - 64, cy + 46, tx.resetYes, {
+      fontSize: '13px', fontFamily: 'Arial',
+      color: '#fff', stroke: '#800000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(83);
+
+    // 「キャンセル」（グレー・右）
+    const noBtn = this.add.rectangle(cx + 64, cy + 46, 110, 40, 0xEEEEEE, 1)
+      .setStrokeStyle(2, 0xBBBBBB).setInteractive({ cursor: 'pointer' }).setDepth(82);
+    const noTxt = this.add.text(cx + 64, cy + 46, tx.resetNo, {
+      fontSize: '13px', fontFamily: 'Arial',
+      color: '#555', stroke: '#fff', strokeThickness: 1,
+    }).setOrigin(0.5).setDepth(83);
+
+    const confirmObjs = [overlay2, panel2, msg, yesBtn, yesTxt, noBtn, noTxt];
+
+    const _closeConfirm = () => {
+      this.tweens.add({
+        targets: confirmObjs, alpha: 0, duration: 150,
+        onComplete: () => {
+          confirmObjs.forEach(o => { if (o && o.scene) o.destroy(); });
+          // 親パネルを再び操作可能に
+          parentObjs.forEach(o => { if (o.setInteractive) o.setInteractive({ cursor: 'pointer' }); });
+        },
+      });
+    };
+
+    yesBtn.on('pointerover', () => yesBtn.setFillStyle(0xFF6666));
+    yesBtn.on('pointerout',  () => yesBtn.setFillStyle(0xFF4444));
+    yesBtn.on('pointerdown', () => { _closeConfirm(); onConfirm(); });
+    noBtn.on('pointerover',  () => noBtn.setFillStyle(0xDDDDDD));
+    noBtn.on('pointerout',   () => noBtn.setFillStyle(0xEEEEEE));
+    noBtn.on('pointerdown',  () => _closeConfirm());
+    overlay2.on('pointerdown', () => _closeConfirm());
+
+    confirmObjs.forEach(o => o.setAlpha(0));
+    this.tweens.add({ targets: confirmObjs, alpha: 1, duration: 150 });
   }
 }

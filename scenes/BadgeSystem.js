@@ -153,4 +153,9 @@ window.BadgeManager = {
   getAll()      { return window.BADGE_DEFS.map(d => ({ ...d, earned: this.isUnlocked(d.id) })); },
   earnedCount() { return this.unlocked.filter(id => window.BADGE_DEFS.some(d => d.id === id)).length; },
   totalCount()  { return window.BADGE_DEFS.length; },
+  reset() {
+    this.unlocked = [];
+    localStorage.removeItem('fruitBubbleBadges');
+    localStorage.removeItem('fruitBubblePlayCount');
+  },
 };
