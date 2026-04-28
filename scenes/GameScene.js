@@ -1152,6 +1152,108 @@ class GameScene extends Phaser.Scene {
       } else {
         showGameOver();
       }
+
+      // リバイブイベントを一度だけ受け付ける（GameOverScene から発火）
+      this.game.events.once('reviveGame', () => this._reviveGame());
+    });
+  }
+
+  // ============================================================
+  //  リバイブ（動画広告後の復活）
+  // ============================================================
+  _reviveGame() {
+    if (this.state !== 'GAME_OVER') return;
+
+    // 上段を削除して下 3 行だけ残す
+    const keepRows = 3;
+    for (let col = 0; col < LANE_COUNT; col++) {
+      while (this.grid[col].length > keepRows) {
+        const spr = this.gridSprites[col][this.gridSprites[col].length - 1];
+        if (spr && spr.scene) spr.destroy();
+        this.grid[col].pop();
+        this.gridSprites[col].pop();
+      }
+      // 残スプライトの Y 再配置
+      for (let r = 0; r < this.gridSprites[col].length; r++) {
+        const spr = this.gridSprites[col][r];
+        if (spr && spr.scene) {
+          this.tweens.add({ targets: spr, y: this._rowY(r), duration: 200, ease: 'Quad.easeOut' });
+        }
+      }
+    }
+
+    // 状態リセット
+    this.state = 'WAITING';
+
+    // BGM 再開
+    this.sound.stopAll();
+    const soundOn = localStorage.getItem('fruitBubbleSound') !== 'off';
+    this.sound.setMute(!soundOn);
+    this.sound.play('bgm_main', { loop: true, volume: 0.55 });
+
+    // UIScene 再起動
+    this.scene.launch('UIScene');
+    this.time.delayedCall(150, () => this._updateUI());
+
+    // 入力リスナーを再登録
+    this._resumeInputAfterRevive();
+
+    // 新しいフルーツをスポーン
+    this.nextLevel = this._randomLevel();
+    this._spawnCurrent();
+
+    // 下押し出しタイマー再起動
+    this.time.delayedCall(400, () => {
+      this._initBottomFruits();
+      this._startPushTimer();
+    });
+
+    // GameOverScene を停止
+    this.scene.stop('GameOverScene');
+
+    // 復活演出: 緑フラッシュ
+    const flash = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x66BB6A, 0.75).setDepth(100);
+    this.tweens.add({ targets: flash, alpha: 0, duration: 700, onComplete: () => flash.destroy() });
+    this.cameras.main.shake(300, 0.008);
+
+    const reviveText = this.add.text(GAME_W / 2, GAME_H / 2, '💚 REVIVED! 💚', {
+      fontSize: '34px', fontFamily: 'Arial Black, Arial',
+      color: '#FFFFFF', stroke: '#2E7D32', strokeThickness: 5,
+    }).setOrigin(0.5).setDepth(101).setAlpha(0);
+    this.tweens.add({
+      targets: reviveText,
+      alpha: { from: 0, to: 1 },
+      scaleX: { from: 0.5, to: 1.1 }, scaleY: { from: 0.5, to: 1.1 },
+      duration: 300, ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: reviveText, alpha: 0, y: GAME_H / 2 - 60,
+          duration: 700, delay: 800,
+          onComplete: () => { if (reviveText && reviveText.scene) reviveText.destroy(); },
+        });
+      },
+    });
+  }
+
+  _resumeInputAfterRevive() {
+    let swipeStartX = -1;
+    this.input.on('pointerdown', pointer => {
+      if (pointer.y < HEADER_H) return;
+      swipeStartX = pointer.x;
+      const col = Phaser.Math.Clamp(Math.floor(pointer.x / LANE_W), 0, LANE_COUNT - 1);
+      if (this.laneHL) this.laneHL.setX(this._laneX(col)).setVisible(true);
+    });
+    this.input.on('pointermove', pointer => {
+      if (!pointer.isDown || swipeStartX < 0) return;
+      const col = Phaser.Math.Clamp(Math.floor(pointer.x / LANE_W), 0, LANE_COUNT - 1);
+      if (this.laneHL) this.laneHL.setX(this._laneX(col));
+    });
+    this.input.on('pointerup', pointer => {
+      if (this.laneHL) this.laneHL.setVisible(false);
+      if (swipeStartX < 0) return;
+      const col = Phaser.Math.Clamp(Math.floor(pointer.x / LANE_W), 0, LANE_COUNT - 1);
+      this._dropIntoLane(col);
+      swipeStartX = -1;
     });
   }
 

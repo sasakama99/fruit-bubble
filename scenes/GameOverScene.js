@@ -25,7 +25,7 @@ class GameOverScene extends Phaser.Scene {
     this.tweens.add({ targets: overlay, alpha: 0.5, duration: 400 });
 
     // パネル（下から飛び上がる）
-    const panel = this.add.rectangle(240, 900, 340, 440, 0xFFF0F8, 1)
+    const panel = this.add.rectangle(240, 900, 340, 490, 0xFFF0F8, 1)
       .setStrokeStyle(4, 0xFF8FB8).setDepth(1);
     this.tweens.add({
       targets: panel, y: 360,
@@ -39,21 +39,21 @@ class GameOverScene extends Phaser.Scene {
     const isNewBest = this.finalScore >= this.bestScore;
 
     // ゲームオーバータイトル
-    const title = this.add.text(240, 190, tx.gameOver, {
+    const title = this.add.text(240, 175, tx.gameOver, {
       fontSize: '30px', fontFamily: 'Arial',
       color: '#E53935', stroke: '#fff', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(2).setAlpha(0);
     this.tweens.add({ targets: title, alpha: 1, duration: 300 });
 
     // ランク表示
-    const rankTxt = this.add.text(240, 240, `${rank.emoji} ${rank.name}`, {
+    const rankTxt = this.add.text(240, 222, `${rank.emoji} ${rank.name}`, {
       fontSize: '22px', fontFamily: 'Arial',
       color: '#A0397A', stroke: '#fff', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(2).setAlpha(0);
     this.tweens.add({ targets: rankTxt, alpha: 1, duration: 300, delay: 100 });
 
     // スコア（カウントアップアニメ）
-    const scoreLabel = this.add.text(240, 285, `${tx.score}: 0`, {
+    const scoreLabel = this.add.text(240, 265, `${tx.score}: 0`, {
       fontSize: '26px', fontFamily: 'Arial',
       color: '#333', stroke: '#fff', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(2).setAlpha(0);
@@ -82,7 +82,7 @@ class GameOverScene extends Phaser.Scene {
     const bestStr   = isNewBest
       ? `🏆 ${tx.best === 'Best' ? 'NEW BEST' : 'NEW BEST'}: ${this.bestScore.toLocaleString()}`
       : `${tx.best}: ${this.bestScore.toLocaleString()}`;
-    const bestTxt = this.add.text(240, 328, bestStr, {
+    const bestTxt = this.add.text(240, 308, bestStr, {
       fontSize: '17px', fontFamily: 'Arial',
       color: bestColor, stroke: '#fff', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(2).setAlpha(0);
@@ -98,28 +98,66 @@ class GameOverScene extends Phaser.Scene {
 
     // 次のランクまで
     if (this.nextRankPts > 0) {
-      const nextTxt = this.add.text(240, 368, tx.nextRank(this.nextRankPts), {
+      const nextTxt = this.add.text(240, 345, tx.nextRank(this.nextRankPts), {
         fontSize: '13px', fontFamily: 'Arial',
         color: '#666', stroke: '#fff', strokeThickness: 1,
       }).setOrigin(0.5).setDepth(2).setAlpha(0);
       this.tweens.add({ targets: nextTxt, alpha: 1, duration: 300, delay: 500 });
     }
 
-    // リトライボタン（ピンク）
-    const btn = this.add.rectangle(240, 435, 210, 52, 0xFF8FB8, 1)
+    // ── リバイブボタン（動画広告で復活）
+    const reviveY = 398;
+    const revBtn = this.add.rectangle(240, reviveY, 260, 50, 0xF9A825, 1)
+      .setStrokeStyle(2, 0xF57F17).setInteractive({ cursor: 'pointer' }).setDepth(2).setAlpha(0);
+    const revBtnTxt = this.add.text(240, reviveY, tx.reviveBtn, {
+      fontSize: '15px', fontFamily: 'Arial',
+      color: '#fff', stroke: '#5D4037', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(3).setAlpha(0);
+    this.tweens.add({ targets: [revBtn, revBtnTxt], alpha: 1, duration: 300, delay: 550 });
+
+    let reviveUsed = false;
+    revBtn.on('pointerover', () => { if (!reviveUsed) revBtn.setFillStyle(0xFFCA28); });
+    revBtn.on('pointerout',  () => { if (!reviveUsed) revBtn.setFillStyle(0xF9A825); });
+    revBtn.on('pointerdown', () => {
+      if (reviveUsed) return;
+      reviveUsed = true;
+      revBtn.disableInteractive().setFillStyle(0xBDBDBD);
+      revBtnTxt.setText(tx.reviveWatching).setColor('#888');
+
+      const doRevive = (rewarded) => {
+        if (rewarded) {
+          // ゲームシーンにリバイブを通知
+          this.game.events.emit('reviveGame');
+          // GameOverScene 自体は GameScene._reviveGame() 内で stop() される
+        } else {
+          // 広告が再生されなかった
+          revBtnTxt.setText(tx.reviveNotAvail).setColor('#888');
+        }
+      };
+
+      if (typeof sdk !== 'undefined' && sdk.showRewarded) {
+        sdk.showRewarded(doRevive);
+      } else {
+        // SDK 未対応環境（GitHub Pages 等）: 即座に復活（テスト用）
+        this.time.delayedCall(200, () => doRevive(true));
+      }
+    });
+
+    // ── リトライボタン（ピンク）
+    const btn = this.add.rectangle(240, 460, 210, 48, 0xFF8FB8, 1)
       .setStrokeStyle(2, 0xFF6B9D).setInteractive({ cursor: 'pointer' }).setDepth(2).setAlpha(0);
-    const btnTxt = this.add.text(240, 435, tx.playAgain, {
-      fontSize: '20px', fontFamily: 'Arial',
+    const btnTxt = this.add.text(240, 460, tx.playAgain, {
+      fontSize: '18px', fontFamily: 'Arial',
       color: '#fff', stroke: '#C0006A', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(3).setAlpha(0);
-    this.tweens.add({ targets: [btn, btnTxt], alpha: 1, duration: 300, delay: 600 });
+    this.tweens.add({ targets: [btn, btnTxt], alpha: 1, duration: 300, delay: 650 });
 
     btn.on('pointerover', () => btn.setFillStyle(0xFFB3CE));
     btn.on('pointerout',  () => btn.setFillStyle(0xFF8FB8));
     btn.on('pointerdown', () => {
       btn.disableInteractive();
       this.tweens.add({
-        targets: [panel, title, rankTxt, scoreLabel, bestTxt, btn, btnTxt],
+        targets: [panel, title, rankTxt, scoreLabel, bestTxt, btn, btnTxt, revBtn, revBtnTxt],
         alpha: 0, duration: 200,
         onComplete: () => {
           // Phaser のシーンライフサイクル競合を完全に回避するため
@@ -131,7 +169,7 @@ class GameOverScene extends Phaser.Scene {
     });
 
     // シェアボタン
-    const shareBtn = this.add.text(240, 490, tx.share, {
+    const shareBtn = this.add.text(240, 514, tx.share, {
       fontSize: '13px', fontFamily: 'Arial',
       color: '#1976D2', stroke: '#fff', strokeThickness: 1,
     }).setOrigin(0.5).setDepth(2).setAlpha(0).setInteractive({ cursor: 'pointer' });
