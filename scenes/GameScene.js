@@ -663,52 +663,85 @@ class GameScene extends Phaser.Scene {
     this.hasFevered    = true;
     this._emitBadges(window.BadgeManager.checkEvent('fever'));
 
-    // Step9: フィーバーSE
     this._playSE('fever');
-    // BGM: bgm_main → bgm_fever に切り替え
     this.sound.stopAll();
     this.sound.play('bgm_fever', { loop: true, volume: 0.65 });
 
-    // 「FEVER!」大文字テキスト
-    const feverTxt = this.add.text(GAME_W / 2, GAME_H / 2, 'FEVER!', {
-      fontSize: '72px', fontFamily: 'Arial Black',
-      color: '#FFD700', stroke: '#FF4400', strokeThickness: 9,
-    }).setOrigin(0.5).setDepth(50).setAlpha(0);
+    // ── ① 白フラッシュ（全画面）
+    const flash = this.add.rectangle(GAME_W/2, GAME_H/2, GAME_W, GAME_H, 0xFFFFFF, 0).setDepth(55);
+    this.tweens.add({
+      targets: flash, alpha: { from: 0.85, to: 0 },
+      duration: 600, ease: 'Quad.easeOut',
+      onComplete: () => flash.destroy(),
+    });
+
+    // ── ② カメラシェイク
+    this.cameras.main.shake(500, 0.012);
+
+    // ── ③ 虹色パーティクルバースト（画面中央から放射）
+    if (!this.textures.exists('fvParticle')) {
+      const g = this.make.graphics({ add: false });
+      g.fillStyle(0xFFFFFF); g.fillCircle(6, 6, 6);
+      g.generateTexture('fvParticle', 12, 12); g.destroy();
+    }
+    const burstColors = [0xFF4444, 0xFF8800, 0xFFD700, 0x44DD44, 0x44AAFF, 0xDD44FF, 0xFF44AA];
+    burstColors.forEach((tint, i) => {
+      const angle = (i / burstColors.length) * Math.PI * 2;
+      const em = this.add.particles(GAME_W / 2, GAME_H / 2, 'fvParticle', {
+        speed: { min: 180, max: 420 },
+        angle: { min: Phaser.Math.RadToDeg(angle) - 22, max: Phaser.Math.RadToDeg(angle) + 22 },
+        lifespan: 900, scale: { start: 1.0, end: 0 },
+        alpha: { start: 1, end: 0 }, tint, quantity: 6,
+        emitting: false,
+      }).setDepth(52);
+      em.explode(6);
+      this.time.delayedCall(1200, () => { if (em && em.scene) em.destroy(); });
+    });
+
+    // ── ④「FEVER!」テキスト（スケール＋シェイク）
+    const feverTxt = this.add.text(GAME_W / 2, GAME_H / 2, '🌈 FEVER! 🌈', {
+      fontSize: '76px', fontFamily: 'Arial Black',
+      color: '#FFD700', stroke: '#FF2200', strokeThickness: 10,
+      shadow: { offsetX: 4, offsetY: 4, color: '#FF6600', blur: 8, fill: true },
+    }).setOrigin(0.5).setDepth(51).setAlpha(0).setScale(0.2);
 
     this.tweens.add({
       targets: feverTxt,
-      alpha: { from: 0, to: 1 },
-      scaleX: { from: 0.3, to: 1.2 }, scaleY: { from: 0.3, to: 1.2 },
-      duration: 400, ease: 'Back.easeOut',
+      alpha: 1, scaleX: 1.25, scaleY: 1.25,
+      duration: 380, ease: 'Back.easeOut',
       onComplete: () => {
+        // 左右シェイク
         this.tweens.add({
-          targets: feverTxt,
-          alpha: 0, y: feverTxt.y - 80,
-          duration: 700, delay: 500, ease: 'Quad.easeIn',
-          onComplete: () => feverTxt.destroy(),
+          targets: feverTxt, x: { from: GAME_W/2 - 8, to: GAME_W/2 + 8 },
+          yoyo: true, repeat: 4, duration: 60, ease: 'Sine.easeInOut',
+          onComplete: () => {
+            this.tweens.add({
+              targets: feverTxt, alpha: 0, y: feverTxt.y - 100, scaleX: 0.8, scaleY: 0.8,
+              duration: 600, delay: 300, ease: 'Quad.easeIn',
+              onComplete: () => feverTxt.destroy(),
+            });
+          }
         });
       }
     });
 
-    // 「スコア2倍!」サブテキスト
-    const multTxt = this.add.text(GAME_W / 2, GAME_H / 2 + 70, window.t().scoreX2, {
-      fontSize: '32px', fontFamily: 'Arial',
-      color: '#FF6B6B', stroke: '#fff', strokeThickness: 4,
-    }).setOrigin(0.5).setDepth(50).setAlpha(0);
-
+    // ── ⑤「スコア2倍!」サブテキスト
+    const multTxt = this.add.text(GAME_W / 2, GAME_H / 2 + 80, window.t().scoreX2, {
+      fontSize: '34px', fontFamily: 'Arial Black',
+      color: '#FF6B6B', stroke: '#fff', strokeThickness: 5,
+    }).setOrigin(0.5).setDepth(51).setAlpha(0);
     this.tweens.add({
-      targets: multTxt,
-      alpha: { from: 0, to: 1 }, duration: 400, delay: 200,
+      targets: multTxt, alpha: 1, duration: 300, delay: 250,
       onComplete: () => {
         this.tweens.add({
           targets: multTxt, alpha: 0,
-          duration: 600, delay: 600, ease: 'Quad.easeIn',
+          duration: 500, delay: 700, ease: 'Quad.easeIn',
           onComplete: () => multTxt.destroy(),
         });
       }
     });
 
-    // 虹色フィールド背景
+    // ── ⑥ 虹色フィールド背景
     this.feverBg = this.add.rectangle(
       GAME_W / 2, HEADER_H + FIELD_H / 2, GAME_W, FIELD_H, 0xFF6B6B, 0.18
     ).setDepth(0);
@@ -716,10 +749,10 @@ class GameScene extends Phaser.Scene {
     const feverColors = [0xFF6B6B, 0xFFD93D, 0x6BCB77, 0x4D96FF, 0xC77DFF];
     let ci = 0;
     this.feverColorTimer = this.time.addEvent({
-      delay: 250, loop: true,
+      delay: 200, loop: true,
       callback: () => {
         ci = (ci + 1) % feverColors.length;
-        this.feverBg.setFillStyle(feverColors[ci], 0.18);
+        this.feverBg.setFillStyle(feverColors[ci], 0.22);
       }
     });
 

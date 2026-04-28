@@ -29,6 +29,7 @@ window.T = {
     howToPlay: [
       '🎯 上のフルーツをタップして\n　 好きなレーンに落とそう',
       '🍇 同じフルーツが 3つ以上\n　 縦か横に並ぶと消える！',
+      '👑 王冠フルーツは 2個並ぶだけで\n　 消えてレアフルーツに合体！',
       '✨ 消えるときコンボすると\n　 大きいフルーツに合体！',
       '⬆ 10秒ごとに下から\n　 フルーツが押し上がってくる',
       '💀 フィールドがいっぱいに\n　 なるとゲームオーバー',
@@ -78,6 +79,7 @@ window.T = {
     howToPlay: [
       '🎯 Tap the fruit at the top\n   to drop it into a lane',
       '🍇 3+ matching fruits in a row\n   or column disappear!',
+      '👑 Crown fruits need only 2\n   in a row to merge!',
       '✨ Chain combos to merge\n   into bigger fruits!',
       '⬆ Every 10s, fruits push up\n   from the bottom',
       '💀 Game over when the\n   field fills to the top',
