@@ -361,7 +361,8 @@ class GameScene extends Phaser.Scene {
     const feverMult  = this.feverMode ? 2 : 1;
     let totalScore   = 0;
 
-    const bigExplosions = []; // Lv6以上の爆発消滅リスト
+    const bigExplosions = []; // 視覚エフェクト用（マッチ中央1点）
+    const blastSources  = []; // 爆風源（マッチした各フルーツ1個ずつ）
 
     for (const m of matches) {
       const newLevel  = Math.min(m.level + 1, 8);
@@ -373,11 +374,13 @@ class GameScene extends Phaser.Scene {
       if (m.type === 'h') {
         for (let c = m.startCol; c < m.startCol + m.count; c++) {
           removeSet.add(`${c},${m.row}`);
+          // 爆発フルーツ1個ずつを爆風源に登録
+          if (isBoom) blastSources.push({ col: c, row: m.row, level: m.level });
         }
         const centerCol = m.startCol + Math.floor(m.count / 2);
         const px = this._laneX(centerCol), py = this._rowY(m.row);
         if (isBoom) {
-          bigExplosions.push({ x: px, y: py, level: m.level, col: centerCol, row: m.row });
+          bigExplosions.push({ x: px, y: py, level: m.level });
         } else {
           (insertions[centerCol] = insertions[centerCol] || []).push(
             { kind: 'top', level: newLevel }
@@ -387,12 +390,14 @@ class GameScene extends Phaser.Scene {
       } else {
         for (let r = m.startRow; r < m.startRow + m.count; r++) {
           removeSet.add(`${m.col},${r}`);
+          // 爆発フルーツ1個ずつを爆風源に登録
+          if (isBoom) blastSources.push({ col: m.col, row: r, level: m.level });
         }
         const centerRow = m.startRow + Math.floor(m.count / 2);
         const px = this._laneX(m.col);
         const py = this._rowY(centerRow);
         if (isBoom) {
-          bigExplosions.push({ x: px, y: py, level: m.level, col: m.col, row: centerRow });
+          bigExplosions.push({ x: px, y: py, level: m.level });
         } else {
           (insertions[m.col] = insertions[m.col] || []).push(
             { kind: 'at', row: m.startRow, level: newLevel }
@@ -402,17 +407,17 @@ class GameScene extends Phaser.Scene {
       }
     }
 
-    // ── 爆発の巻き込み範囲（隣接フルーツも消す）
+    // ── 爆発の巻き込み範囲（各フルーツ1個ずつから爆風を出す）
     const blastKeys = new Set(); // 巻き込みセルだけ別に追跡（フラッシュ演出用）
-    for (const e of bigExplosions) {
+    for (const src of blastSources) {
       // Lv6: クロス4マス（上下左右のみ）/ Lv7: 3×3の8マス（斜め含む）
       for (let dc = -1; dc <= 1; dc++) {
         for (let dr = -1; dr <= 1; dr++) {
           if (dc === 0 && dr === 0) continue;
           // Lv6 はクロス型（斜め除外: |dc|+|dr|>1 をスキップ）
-          if (e.level < 7 && Math.abs(dc) + Math.abs(dr) > 1) continue;
-          const nc = e.col + dc;
-          const nr = e.row + dr;
+          if (src.level < 7 && Math.abs(dc) + Math.abs(dr) > 1) continue;
+          const nc = src.col + dc;
+          const nr = src.row + dr;
           if (nc < 0 || nc >= LANE_COUNT) continue;
           if (nr < 0 || !this.grid[nc] || nr >= this.grid[nc].length) continue;
           const key = `${nc},${nr}`;
