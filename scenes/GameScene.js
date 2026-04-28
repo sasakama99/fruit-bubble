@@ -1086,6 +1086,13 @@ class GameScene extends Phaser.Scene {
     this.state = 'GAME_OVER';
     if (this.feverMode) this._endFever();
 
+    // タッチ中のレーンハイライトを即座に非表示
+    if (this.laneHL) this.laneHL.setVisible(false);
+    // 入力イベントを無効化（ゲームオーバー後のタップ誤爆防止）
+    this.input.off('pointerdown');
+    this.input.off('pointermove');
+    this.input.off('pointerup');
+
     // 下押し出しタイマーを停止
     if (this.pushTimer)      { this.pushTimer.remove();      this.pushTimer      = null; }
     if (this.pushTimerTween) { this.pushTimerTween.stop();   this.pushTimerTween = null; }
