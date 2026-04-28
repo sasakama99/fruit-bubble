@@ -486,10 +486,12 @@ class UIScene extends Phaser.Scene {
     if (gs.scene.isActive()) {
       gs.scene.pause();
       this.pauseLabel.setText('▶');
+      this.sound.setMute(true);   // ポーズ中は設定に関係なくBGMミュート
       this._showPauseOverlay();
     } else {
       gs.scene.resume();
       this.pauseLabel.setText('||');
+      this.sound.setMute(!this.soundOn);  // ユーザーの音量設定に戻す
       if (this.pauseOverlay) { this.pauseOverlay.destroy(); this.pauseOverlay = null; }
       if (this.pauseTxt)     { this.pauseTxt.destroy();     this.pauseTxt     = null; }
     }
