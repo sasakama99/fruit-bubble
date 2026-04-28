@@ -456,37 +456,20 @@ class GameScene extends Phaser.Scene {
       this._emitBadges(window.BadgeManager.checkFruit(newLevel));
     }
 
-    // 削除対象スプライトを収集（巻き込みセルは別リストに分ける）
+    // 削除対象スプライトを収集
     const removeSprites = [];
-    const blastSprites  = [];
     for (const key of removeSet) {
       const [c, r] = key.split(',').map(Number);
       const spr = this.gridSprites[c] && this.gridSprites[c][r];
-      if (!spr) continue;
-      if (blastKeys.has(key)) blastSprites.push(spr);
-      else removeSprites.push(spr);
-    }
-
-    // 巻き込みフルーツを一瞬オレンジ色にフラッシュ（爆風に巻き込まれた演出）
-    if (blastSprites.length > 0) {
-      blastSprites.forEach(spr => {
-        this.tweens.add({
-          targets: spr,
-          alpha: { from: 1, to: 0.25 },
-          duration: 90, yoyo: true,  // 90ms暗 + 90ms戻る = 180ms
-          onComplete: () => { if (spr && spr.scene) spr.setTint(0xFF6600); },
-        });
-      });
+      if (spr) removeSprites.push(spr);
     }
 
     this.tweens.add({
-      targets: [...removeSprites, ...blastSprites],
+      targets: removeSprites,
       scaleX: 0, scaleY: 0, alpha: 0,
       duration: 170, ease: 'Quad.easeIn',
-      delay: blastSprites.length > 0 ? 180 : 0, // フラッシュ180ms後に消える
       onComplete: () => {
         removeSprites.forEach(s => s.destroy());
-        blastSprites.forEach(s => { if (s && s.scene) s.destroy(); });
 
         // 各列を圧縮（削除済セルを除去）
         for (let c = 0; c < LANE_COUNT; c++) {
