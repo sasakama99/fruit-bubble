@@ -68,6 +68,26 @@ class GameScene extends Phaser.Scene {
     this.events.once('shutdown', this._onShutdown, this);
   }
 
+  update() {
+    if (!this.glowMap || this.glowMap.size === 0) return;
+    const t = this.time.now;
+    this.glowMap.forEach((d, spr) => {
+      if (!spr || !spr.scene || !d.ring || !d.ring.scene) return;
+      d.ring.setPosition(spr.x, spr.y);
+      d.ring.clear();
+      // 内側リング（メインカラー）
+      const h1  = (t / 18) % 360;
+      const c1  = Phaser.Display.Color.HSVToRGB(h1 / 360, 1, 1);
+      d.ring.lineStyle(4, Phaser.Display.Color.GetColor(c1.r, c1.g, c1.b), 0.88);
+      d.ring.strokeCircle(0, 0, d.r);
+      // 外側リング（90°ずらし、半透明）
+      const h2  = (h1 + 90) % 360;
+      const c2  = Phaser.Display.Color.HSVToRGB(h2 / 360, 1, 1);
+      d.ring.lineStyle(2, Phaser.Display.Color.GetColor(c2.r, c2.g, c2.b), 0.42);
+      d.ring.strokeCircle(0, 0, d.r + 5);
+    });
+  }
+
   _onShutdown() {
     if (this.pushTimer)         { this.pushTimer.remove();         this.pushTimer         = null; }
     if (this.pushTimerTween)    { this.pushTimerTween.stop();      this.pushTimerTween    = null; }
@@ -82,6 +102,10 @@ class GameScene extends Phaser.Scene {
     this.pushBar       = null;
     this.pushTimerText = null;
     this.pushCountLabel= null;
+    if (this.glowMap) {
+      this.glowMap.forEach(d => { if (d.ring && d.ring.scene) d.ring.destroy(); });
+      this.glowMap.clear();
+    }
   }
 
   // ============================================================
@@ -96,6 +120,13 @@ class GameScene extends Phaser.Scene {
     this.currentLevel = null;
     this.currentSprite = null;
     this.bobTween     = null;
+    // 虹色リング（Lv4以上の2マッチフルーツ）
+    if (this.glowMap) {
+      this.glowMap.forEach(d => { if (d.ring && d.ring.scene) d.ring.destroy(); });
+      this.glowMap.clear();
+    } else {
+      this.glowMap = new Map();
+    }
 
     // フィーバー状態
     this.feverMode    = false;
@@ -137,6 +168,24 @@ class GameScene extends Phaser.Scene {
     this.time.delayedCall(400, () => {
       this._initBottomFruits();
       this._startPushTimer();
+    });
+  }
+
+  // ============================================================
+  //  虹色グローリング（Lv4以上の2マッチフルーツに付加）
+  // ============================================================
+  _addGlowRing(sprite, level) {
+    if (!sprite || !sprite.scene || level < 4) return;
+    if (!this.glowMap) this.glowMap = new Map();
+    if (this.glowMap.has(sprite)) return;
+    const ring = this.add.graphics().setDepth(sprite.depth + 0.5);
+    // フルーツの表示半径を事前計算（scale * canvas半径）
+    const r = (FRUITS[Math.min(level, 8) - 1].size / 2 + 18) * this._fruitScale(level) + 5;
+    this.glowMap.set(sprite, { ring, r });
+    sprite.on('destroy', () => {
+      const d = this.glowMap.get(sprite);
+      if (d && d.ring && d.ring.scene) d.ring.destroy();
+      this.glowMap.delete(sprite);
     });
   }
 
@@ -274,6 +323,7 @@ class GameScene extends Phaser.Scene {
           onComplete: () => {
             this.grid[col].push(level);
             this.gridSprites[col].push(this.currentSprite);
+            this._addGlowRing(this.currentSprite, level);
             this.currentSprite = null;
 
             // マッチ消去を先に処理 → 消えた後でゲームオーバー判定
@@ -461,6 +511,7 @@ class GameScene extends Phaser.Scene {
             this.grid[col].splice(insertRow, 0, i.level);
             this.gridSprites[col].splice(insertRow, 0, spr);
             newSprites.push({ sprite: spr, level: i.level });
+            this._addGlowRing(spr, i.level);
           }
           // 横マッチの新フルーツは中央レーンの頂上に
           for (const i of topIns) {
@@ -471,6 +522,7 @@ class GameScene extends Phaser.Scene {
             this.grid[col].push(i.level);
             this.gridSprites[col].push(spr);
             newSprites.push({ sprite: spr, level: i.level });
+            this._addGlowRing(spr, i.level);
           }
         });
 
@@ -560,6 +612,7 @@ class GameScene extends Phaser.Scene {
 
         this.grid[col].splice(startRow, 0, newLevel2);
         this.gridSprites[col].splice(startRow, 0, newSprite);
+        this._addGlowRing(newSprite, newLevel2);
 
         // 上段を正しい位置へ
         for (let r = startRow + 1; r < this.gridSprites[col].length; r++) {
@@ -638,6 +691,7 @@ class GameScene extends Phaser.Scene {
 
           this.grid[centerCol].push(newLevel);
           this.gridSprites[centerCol].push(newSprite);
+          this._addGlowRing(newSprite, newLevel);
 
           this.tweens.add({
             targets: newSprite,
@@ -1158,6 +1212,7 @@ class GameScene extends Phaser.Scene {
       // グリッドに先頭挿入
       this.grid[col].unshift(this.bottomLevels[col]);
       this.gridSprites[col].unshift(this.bottomFruits[col]);
+      this._addGlowRing(this.bottomFruits[col], this.bottomLevels[col]);
 
       // スプライトをレーン底(row=0)へアニメ
       const spr = this.bottomFruits[col];
@@ -1355,37 +1410,6 @@ class GameScene extends Phaser.Scene {
     hGrad.addColorStop(0,'rgba(255,255,255,0.85)'); hGrad.addColorStop(1,'rgba(255,255,255,0)');
     ctx.beginPath(); ctx.arc(cx-r*.3,cy-r*.3,r*.28,0,Math.PI*2); ctx.fillStyle=hGrad; ctx.fill();
     ctx.beginPath(); ctx.arc(cx,cy,r+5,0,Math.PI*2); ctx.strokeStyle='rgba(255,255,255,0.65)'; ctx.lineWidth=2.5; ctx.stroke();
-    // Lv4以上（2個で消える）は右上に⭐バッジを表示
-    if (fruit.level >= 4) this._drawStarBadge(ctx, cx, cy, r);
-  }
-
-  _drawStarBadge(ctx, cx, cy, r) {
-    const bx = cx + r * 0.62, by = cy - r * 0.62;
-    const br = Math.max(7, r * 0.28);
-    ctx.save();
-    // 白い縁取り円
-    ctx.beginPath(); ctx.arc(bx, by, br + 2, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.fill();
-    // 金色の丸バッジ
-    const gGrad = ctx.createRadialGradient(bx - br * 0.2, by - br * 0.2, 0, bx, by, br);
-    gGrad.addColorStop(0, '#FFE566'); gGrad.addColorStop(1, '#FFB300');
-    ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2);
-    ctx.fillStyle = gGrad; ctx.fill();
-    // ⭐ 星を描画
-    ctx.save();
-    ctx.translate(bx, by);
-    ctx.fillStyle = '#FFF8E1';
-    const sp = 5, ip = 2.5, starR = br * 0.62;
-    ctx.beginPath();
-    for (let i = 0; i < sp * 2; i++) {
-      const angle = (i * Math.PI) / sp - Math.PI / 2;
-      const rad   = i % 2 === 0 ? starR : starR * 0.42;
-      i === 0 ? ctx.moveTo(Math.cos(angle) * rad, Math.sin(angle) * rad)
-              : ctx.lineTo(Math.cos(angle) * rad, Math.sin(angle) * rad);
-    }
-    ctx.closePath(); ctx.fill();
-    ctx.restore();
-    ctx.restore();
   }
 
   _drawDetails(ctx,cx,cy,r,level,color){
