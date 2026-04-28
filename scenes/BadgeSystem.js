@@ -154,7 +154,7 @@ window.BadgeManager = {
   earnedCount() { return this.unlocked.filter(id => window.BADGE_DEFS.some(d => d.id === id)).length; },
   totalCount()  { return window.BADGE_DEFS.length; },
   reset() {
-    this.unlocked = [];
+    this._unlocked = [];   // getter の裏側に直接代入（setter がないため）
     localStorage.removeItem('fruitBubbleBadges');
     localStorage.removeItem('fruitBubblePlayCount');
   },
