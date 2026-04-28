@@ -377,7 +377,7 @@ class GameScene extends Phaser.Scene {
         const centerCol = m.startCol + Math.floor(m.count / 2);
         const px = this._laneX(centerCol), py = this._rowY(m.row);
         if (isBoom) {
-          bigExplosions.push({ x: px, y: py, level: m.level });
+          bigExplosions.push({ x: px, y: py, level: m.level, col: centerCol, row: m.row });
         } else {
           (insertions[centerCol] = insertions[centerCol] || []).push(
             { kind: 'top', level: newLevel }
@@ -388,16 +388,42 @@ class GameScene extends Phaser.Scene {
         for (let r = m.startRow; r < m.startRow + m.count; r++) {
           removeSet.add(`${m.col},${r}`);
         }
+        const centerRow = m.startRow + Math.floor(m.count / 2);
         const px = this._laneX(m.col);
-        const py = this._rowY(m.startRow + Math.floor(m.count / 2));
+        const py = this._rowY(centerRow);
         if (isBoom) {
-          bigExplosions.push({ x: px, y: py, level: m.level });
+          bigExplosions.push({ x: px, y: py, level: m.level, col: m.col, row: centerRow });
         } else {
           (insertions[m.col] = insertions[m.col] || []).push(
             { kind: 'at', row: m.startRow, level: newLevel }
           );
         }
         popups.push({ x: px, y: py, score: addScore });
+      }
+    }
+
+    // ── 爆発の巻き込み範囲（隣接フルーツも消す）
+    const blastKeys = new Set(); // 巻き込みセルだけ別に追跡（フラッシュ演出用）
+    for (const e of bigExplosions) {
+      // Lv6: クロス4マス（上下左右のみ）/ Lv7: 3×3の8マス（斜め含む）
+      for (let dc = -1; dc <= 1; dc++) {
+        for (let dr = -1; dr <= 1; dr++) {
+          if (dc === 0 && dr === 0) continue;
+          // Lv6 はクロス型（斜め除外: |dc|+|dr|>1 をスキップ）
+          if (e.level < 7 && Math.abs(dc) + Math.abs(dr) > 1) continue;
+          const nc = e.col + dc;
+          const nr = e.row + dr;
+          if (nc < 0 || nc >= LANE_COUNT) continue;
+          if (nr < 0 || !this.grid[nc] || nr >= this.grid[nc].length) continue;
+          const key = `${nc},${nr}`;
+          if (removeSet.has(key)) continue;
+          removeSet.add(key);
+          blastKeys.add(key);
+          // 巻き込みスコア（そのフルーツのスコア × フィーバー倍率）
+          const blastAdd = FRUITS[this.grid[nc][nr] - 1].score * feverMult;
+          totalScore += blastAdd;
+          popups.push({ x: this._laneX(nc), y: this._rowY(nr), score: blastAdd });
+        }
       }
     }
 
@@ -425,20 +451,37 @@ class GameScene extends Phaser.Scene {
       this._emitBadges(window.BadgeManager.checkFruit(newLevel));
     }
 
-    // 削除対象スプライトを収集
+    // 削除対象スプライトを収集（巻き込みセルは別リストに分ける）
     const removeSprites = [];
+    const blastSprites  = [];
     for (const key of removeSet) {
       const [c, r] = key.split(',').map(Number);
       const spr = this.gridSprites[c] && this.gridSprites[c][r];
-      if (spr) removeSprites.push(spr);
+      if (!spr) continue;
+      if (blastKeys.has(key)) blastSprites.push(spr);
+      else removeSprites.push(spr);
+    }
+
+    // 巻き込みフルーツを一瞬オレンジ色にフラッシュ（爆風に巻き込まれた演出）
+    if (blastSprites.length > 0) {
+      blastSprites.forEach(spr => {
+        this.tweens.add({
+          targets: spr,
+          alpha: { from: 1, to: 0.25 },
+          duration: 90, yoyo: true,  // 90ms暗 + 90ms戻る = 180ms
+          onComplete: () => { if (spr && spr.scene) spr.setTint(0xFF6600); },
+        });
+      });
     }
 
     this.tweens.add({
-      targets: removeSprites,
+      targets: [...removeSprites, ...blastSprites],
       scaleX: 0, scaleY: 0, alpha: 0,
       duration: 170, ease: 'Quad.easeIn',
+      delay: blastSprites.length > 0 ? 180 : 0, // フラッシュ180ms後に消える
       onComplete: () => {
         removeSprites.forEach(s => s.destroy());
+        blastSprites.forEach(s => { if (s && s.scene) s.destroy(); });
 
         // 各列を圧縮（削除済セルを除去）
         for (let c = 0; c < LANE_COUNT; c++) {
