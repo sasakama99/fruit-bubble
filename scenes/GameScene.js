@@ -144,7 +144,9 @@ class GameScene extends Phaser.Scene {
   //  ランダムレベル（Lv1〜4 のみスポーン）
   // ============================================================
   _randomLevel() {
-    const weights = [45, 30, 18, 7];
+    // Lv1〜5をスポーン対象にすることで、孤立したLv5が詰まらないようにする
+    // Lv5は約4%の確率で出現（以前は合体でのみ生成されていた）
+    const weights = [42, 28, 17, 9, 4]; // Lv1〜Lv5
     let rand = Phaser.Math.Between(1, 100);
     for (let i = 0; i < weights.length; i++) {
       if ((rand -= weights[i]) <= 0) return i + 1;
@@ -308,6 +310,8 @@ class GameScene extends Phaser.Scene {
   //  縦横すべてのマッチを一度に検出
   // ============================================================
   _findAllMatches() {
+    // Lv4以上は2個並んでも合体できる（孤立した高レベルフルーツ対策）
+    const _minRun = (level) => level >= 4 ? 2 : 3;
     const out = [];
     // ── 横マッチ
     for (let row = 0; row < MAX_ROWS + 2; row++) {
@@ -320,7 +324,7 @@ class GameScene extends Phaser.Scene {
           this.grid[startCol + runLen].length > row &&
           this.grid[startCol + runLen][row] === level
         ) { runLen++; }
-        if (runLen >= 3) {
+        if (runLen >= _minRun(level)) {
           out.push({ type: 'h', startCol, row, count: runLen, level });
         }
         startCol += runLen;
@@ -335,7 +339,7 @@ class GameScene extends Phaser.Scene {
         while (startRow + runLen < colGrid.length && colGrid[startRow + runLen] === level) {
           runLen++;
         }
-        if (runLen >= 3) {
+        if (runLen >= _minRun(level)) {
           out.push({ type: 'v', col, startRow, count: runLen, level });
         }
         startRow += runLen;
@@ -493,6 +497,7 @@ class GameScene extends Phaser.Scene {
 
   // 横・縦どちらも検出（旧：1件のみ返す互換用）
   _findMatch() {
+    const _minRun = (level) => level >= 4 ? 2 : 3;
     // ── 横マッチ（優先）
     for (let row = 0; row < MAX_ROWS + 2; row++) {
       for (let startCol = 0; startCol < LANE_COUNT; ) {
@@ -504,7 +509,7 @@ class GameScene extends Phaser.Scene {
           this.grid[startCol + runLen].length > row &&
           this.grid[startCol + runLen][row] === level
         ) { runLen++; }
-        if (runLen >= 3) return { type: 'h', startCol, row, count: runLen, level };
+        if (runLen >= _minRun(level)) return { type: 'h', startCol, row, count: runLen, level };
         startCol += runLen;
       }
     }
@@ -517,7 +522,7 @@ class GameScene extends Phaser.Scene {
         while (startRow + runLen < colGrid.length && colGrid[startRow + runLen] === level) {
           runLen++;
         }
-        if (runLen >= 3) return { type: 'v', col, startRow, count: runLen, level };
+        if (runLen >= _minRun(level)) return { type: 'v', col, startRow, count: runLen, level };
         startRow += runLen;
       }
     }
