@@ -1000,16 +1000,24 @@ class GameScene extends Phaser.Scene {
     });
 
     this.time.delayedCall(700, () => {
-      // GameMonetize 広告をゲームオーバー時に表示
-      if (typeof sdk !== 'undefined' && sdk.showBanner) {
-        sdk.showBanner();
-      }
       this.scene.stop('UIScene');
-      this.scene.launch('GameOverScene', {
-        score: this.score,
-        bestScore: best,
-        nextRankPts,
-      });
+
+      // 広告終了後（or SDK未対応）にゲームオーバー画面を表示
+      const showGameOver = () => {
+        this.scene.launch('GameOverScene', {
+          score: this.score,
+          bestScore: best,
+          nextRankPts,
+        });
+      };
+
+      // GameMonetize インタースティシャル（全画面広告）
+      // 広告が終わったコールバックで GameOverScene を起動
+      if (typeof sdk !== 'undefined' && sdk.showInterstitial) {
+        sdk.showInterstitial(showGameOver);
+      } else {
+        showGameOver();
+      }
     });
   }
 
