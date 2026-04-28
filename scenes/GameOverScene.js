@@ -5,9 +5,10 @@ class GameOverScene extends Phaser.Scene {
   constructor() { super({ key: 'GameOverScene' }); }
 
   init(data) {
-    this.finalScore  = data.score       || 0;
-    this.bestScore   = data.bestScore   || 0;
-    this.nextRankPts = data.nextRankPts || 0;
+    this.finalScore      = data.score            || 0;
+    this.bestScore       = data.bestScore        || 0;
+    this.nextRankPts     = data.nextRankPts      || 0;
+    this.reviveAvailable = data.reviveAvailable  !== false;
   }
 
   create() {
@@ -105,43 +106,45 @@ class GameOverScene extends Phaser.Scene {
       this.tweens.add({ targets: nextTxt, alpha: 1, duration: 300, delay: 500 });
     }
 
-    // ── リバイブボタン（動画広告で復活）
+    // ── リバイブボタン（動画広告で復活）— 1プレイ1回限り
     const reviveY = 398;
-    const revBtn = this.add.rectangle(240, reviveY, 260, 50, 0xF9A825, 1)
-      .setStrokeStyle(2, 0xF57F17).setInteractive({ cursor: 'pointer' }).setDepth(2).setAlpha(0);
-    const revBtnTxt = this.add.text(240, reviveY, tx.reviveBtn, {
-      fontSize: '15px', fontFamily: 'Arial',
-      color: '#fff', stroke: '#5D4037', strokeThickness: 2,
+    const revBtnColor = this.reviveAvailable ? 0xF9A825 : 0xBDBDBD;
+    const revBtn = this.add.rectangle(240, reviveY, 260, 50, revBtnColor, 1)
+      .setStrokeStyle(2, this.reviveAvailable ? 0xF57F17 : 0x9E9E9E)
+      .setDepth(2).setAlpha(0);
+    if (this.reviveAvailable) revBtn.setInteractive({ cursor: 'pointer' });
+
+    const revBtnLabel = this.reviveAvailable ? tx.reviveBtn : '📺 復活は1プレイ1回のみ';
+    const revBtnTxt = this.add.text(240, reviveY, revBtnLabel, {
+      fontSize: this.reviveAvailable ? '15px' : '12px', fontFamily: 'Arial',
+      color: this.reviveAvailable ? '#fff' : '#aaa',
+      stroke: this.reviveAvailable ? '#5D4037' : '#888', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(3).setAlpha(0);
     this.tweens.add({ targets: [revBtn, revBtnTxt], alpha: 1, duration: 300, delay: 550 });
 
-    let reviveUsed = false;
-    revBtn.on('pointerover', () => { if (!reviveUsed) revBtn.setFillStyle(0xFFCA28); });
-    revBtn.on('pointerout',  () => { if (!reviveUsed) revBtn.setFillStyle(0xF9A825); });
-    revBtn.on('pointerdown', () => {
-      if (reviveUsed) return;
-      reviveUsed = true;
-      revBtn.disableInteractive().setFillStyle(0xBDBDBD);
-      revBtnTxt.setText(tx.reviveWatching).setColor('#888');
+    if (this.reviveAvailable) {
+      revBtn.on('pointerover', () => revBtn.setFillStyle(0xFFCA28));
+      revBtn.on('pointerout',  () => revBtn.setFillStyle(0xF9A825));
+      revBtn.on('pointerdown', () => {
+        revBtn.disableInteractive().setFillStyle(0xBDBDBD);
+        revBtnTxt.setText(tx.reviveWatching).setColor('#888');
 
-      const doRevive = (rewarded) => {
-        if (rewarded) {
-          // ゲームシーンにリバイブを通知
-          this.game.events.emit('reviveGame');
-          // GameOverScene 自体は GameScene._reviveGame() 内で stop() される
+        const doRevive = (rewarded) => {
+          if (rewarded) {
+            this.game.events.emit('reviveGame');
+          } else {
+            revBtnTxt.setText(tx.reviveNotAvail).setColor('#888');
+          }
+        };
+
+        if (typeof sdk !== 'undefined' && sdk.showRewarded) {
+          sdk.showRewarded(doRevive);
         } else {
-          // 広告が再生されなかった
-          revBtnTxt.setText(tx.reviveNotAvail).setColor('#888');
+          // SDK 未対応環境（GitHub Pages 等）: 3秒後に復活
+          this.time.delayedCall(3000, () => doRevive(true));
         }
-      };
-
-      if (typeof sdk !== 'undefined' && sdk.showRewarded) {
-        sdk.showRewarded(doRevive);
-      } else {
-        // SDK 未対応環境（GitHub Pages 等）: 即座に復活（テスト用）
-        this.time.delayedCall(200, () => doRevive(true));
-      }
-    });
+      });
+    }
 
     // ── リトライボタン（ピンク）
     const btn = this.add.rectangle(240, 460, 210, 48, 0xFF8FB8, 1)

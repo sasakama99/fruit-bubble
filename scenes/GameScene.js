@@ -97,6 +97,9 @@ class GameScene extends Phaser.Scene {
     this.currentSprite = null;
     this.bobTween     = null;
 
+    // リバイブ（1プレイ1回限り）
+    this.reviveAvailable = true;
+
     // フィーバー状態
     this.feverMode    = false;
     this.feverTimeLeft = 0;
@@ -1130,9 +1133,10 @@ class GameScene extends Phaser.Scene {
       // 広告終了後（or SDK未対応）にゲームオーバー画面を表示
       const showGameOver = () => {
         this.scene.launch('GameOverScene', {
-          score: this.score,
-          bestScore: best,
+          score:          this.score,
+          bestScore:      best,
           nextRankPts,
+          reviveAvailable: this.reviveAvailable,
         });
       };
 
@@ -1163,6 +1167,9 @@ class GameScene extends Phaser.Scene {
   // ============================================================
   _reviveGame() {
     if (this.state !== 'GAME_OVER') return;
+
+    // 1プレイにつき1回限り
+    this.reviveAvailable = false;
 
     // 上段を削除して下 3 行だけ残す
     const keepRows = 3;
@@ -1269,15 +1276,14 @@ class GameScene extends Phaser.Scene {
     this.bottomFruits = new Array(LANE_COUNT).fill(null);
     this.bottomLevels = new Array(LANE_COUNT).fill(null);
 
-    // 常に5列全部を押し上げる
-    // （1列だけ押すと列ごとの高さがずれ、横並びのフルーツが
-    //   同一グリッド行にならずマッチ判定できないバグが発生するため）
-    const activeCols = [0, 1, 2, 3, 4];
+    // ランダムに 1〜5 列を選ぶ
+    const count = Phaser.Math.Between(1, 5);
+    const activeCols = Phaser.Utils.Array.Shuffle([0, 1, 2, 3, 4]).slice(0, count).sort((a, b) => a - b);
 
     // ラベル更新
     if (this.pushCountLabel) {
       const tx = window.t();
-      this.pushCountLabel.setText(tx.pushAll).setColor('#E53935');
+      this.pushCountLabel.setText(tx.pushN(count)).setColor('#E53935');
     }
 
     // ── レベル生成（横3マッチ禁止）
