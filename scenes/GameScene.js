@@ -294,6 +294,21 @@ class GameScene extends Phaser.Scene {
   _runMatchCascade(onDone) {
     const matches = this._findAllMatches();
     if (!matches.length) {
+      // カスケード終了：grid と gridSprites の整合性を確認して修復
+      for (let c = 0; c < LANE_COUNT; c++) {
+        const gl = this.grid[c].length;
+        const sl = this.gridSprites[c].length;
+        if (gl !== sl) {
+          // 余分なスプライトを破棄してデータを揃える
+          const minLen = Math.min(gl, sl);
+          for (let r = minLen; r < sl; r++) {
+            if (this.gridSprites[c][r] && this.gridSprites[c][r].scene)
+              this.gridSprites[c][r].destroy();
+          }
+          this.grid[c]        = this.grid[c].slice(0, minLen);
+          this.gridSprites[c] = this.gridSprites[c].slice(0, minLen);
+        }
+      }
       // カスケード終了：余白があればここで詰める
       this._packAllColumns(true);
       this._checkGameOver();
@@ -408,7 +423,7 @@ class GameScene extends Phaser.Scene {
     }
 
     // ── 爆発の巻き込み範囲（各フルーツ1個ずつから爆風を出す）
-    const blastKeys = new Set(); // 巻き込みセルだけ別に追跡（フラッシュ演出用）
+    const blastKeys = new Set();
     for (const src of blastSources) {
       // Lv6: クロス4マス（上下左右のみ）/ Lv7: 3×3の8マス（斜め含む）
       for (let dc = -1; dc <= 1; dc++) {
@@ -456,6 +471,22 @@ class GameScene extends Phaser.Scene {
       this._emitBadges(window.BadgeManager.checkFruit(newLevel));
     }
 
+    // 爆風込みの正確な挿入位置を事前計算
+    // （同列に爆発巻き込み＋縦マッチ挿入が重なるとズレるため、removeSet確定後に補正）
+    for (const colKey in insertions) {
+      const col = parseInt(colKey, 10);
+      insertions[col].forEach(ins => {
+        if (ins.kind === 'at') {
+          // ins.row より下（row 0 ～ ins.row-1）で removeSet に入っていないセル数 = 正しい挿入位置
+          let adj = 0;
+          for (let r = 0; r < ins.row && r < this.grid[col].length; r++) {
+            if (!removeSet.has(`${col},${r}`)) adj++;
+          }
+          ins.adjustedRow = adj;
+        }
+      });
+    }
+
     // 削除対象スプライトを収集
     const removeSprites = [];
     for (const key of removeSet) {
@@ -469,6 +500,12 @@ class GameScene extends Phaser.Scene {
       scaleX: 0, scaleY: 0, alpha: 0,
       duration: 170, ease: 'Quad.easeIn',
       onComplete: () => {
+        // ゲームオーバーが発動済みなら後処理はスキップ（スプライトだけ消して終了）
+        if (this.state === 'GAME_OVER') {
+          removeSprites.forEach(s => { if (s && s.scene) s.destroy(); });
+          return;
+        }
+
         removeSprites.forEach(s => s.destroy());
 
         // 各列を圧縮（削除済セルを除去）
@@ -493,15 +530,28 @@ class GameScene extends Phaser.Scene {
           const atIns  = list.filter(i => i.kind === 'at').sort((a, b) => a.row - b.row);
           const topIns = list.filter(i => i.kind === 'top');
 
-          // 縦マッチの新フルーツは元の startRow 位置へ挿入
-          for (const i of atIns) {
-            const insertRow = Math.min(i.row, this.grid[col].length);
+          // 縦マッチの新フルーツは元の startRow 位置へ挿入（爆風補正済み）
+          // ※複数挿入がある場合、前の splice でインデックスがズレるため
+          //   挿入のたびに後続の adjustedRow を +1 補正する
+          for (let idx = 0; idx < atIns.length; idx++) {
+            const i = atIns[idx];
+            const insertRow = Math.min(
+              i.adjustedRow !== undefined ? i.adjustedRow : i.row,
+              this.grid[col].length
+            );
             const spr = this.add.image(
               this._laneX(col), this._rowY(insertRow), `fruit_${i.level}`
             ).setOrigin(0.5).setScale(0).setDepth(5);
             this.grid[col].splice(insertRow, 0, i.level);
             this.gridSprites[col].splice(insertRow, 0, spr);
             newSprites.push({ sprite: spr, level: i.level });
+            // 後続の挿入位置がこの insertRow 以上なら +1 ずらす
+            for (let j = idx + 1; j < atIns.length; j++) {
+              const adj = atIns[j].adjustedRow !== undefined ? atIns[j].adjustedRow : atIns[j].row;
+              if (adj >= insertRow) {
+                atIns[j].adjustedRow = adj + 1;
+              }
+            }
           }
           // 横マッチの新フルーツは中央レーンの頂上に
           for (const i of topIns) {
@@ -1131,6 +1181,8 @@ class GameScene extends Phaser.Scene {
     if (this.pushTimer)      { this.pushTimer.remove();      this.pushTimer      = null; }
     if (this.pushTimerTween) { this.pushTimerTween.stop();   this.pushTimerTween = null; }
     if (this.bottomFruits)   { this.bottomFruits.forEach(s => { if (s && s.scene) s.destroy(); }); this.bottomFruits = []; }
+    // 進行中のカスケード delayedCall を全停止（ゲームオーバー後の不要コールバック防止）
+    this.time.removeAllEvents();
 
     this._playSE('gameover');
     // BGM: 全停止 → ゲームオーバー曲を再生
@@ -1424,6 +1476,10 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
+    // プッシュ開始直後から ANIMATING にして、ユーザーが同時にフルーツを
+    // 落とせないようにする（プッシュカスケードと通常カスケードの同時進行を防止）
+    this.state = 'ANIMATING';
+
     // 押し上げ対象レーンのみ処理（null = 対象外）
     for (let col = 0; col < LANE_COUNT; col++) {
       if (this.bottomLevels[col] === null) continue; // このレーンはスキップ
@@ -1471,8 +1527,12 @@ class GameScene extends Phaser.Scene {
       this._initBottomFruits();
       this._startPushTimer();
 
-      // カスケード（消去・合体）を並行実行
-      this._runMatchCascade(() => { this.combo = 0; }); // 押し上げカスケード後にコンボをリセット
+      // カスケード（消去・合体）を実行
+      // 完了後に WAITING に戻してユーザー操作を再開可能にする
+      this._runMatchCascade(() => {
+        this.combo = 0;
+        if (this.state !== 'GAME_OVER') this.state = 'WAITING';
+      });
     });
   }
 
