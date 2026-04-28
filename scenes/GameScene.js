@@ -1355,6 +1355,37 @@ class GameScene extends Phaser.Scene {
     hGrad.addColorStop(0,'rgba(255,255,255,0.85)'); hGrad.addColorStop(1,'rgba(255,255,255,0)');
     ctx.beginPath(); ctx.arc(cx-r*.3,cy-r*.3,r*.28,0,Math.PI*2); ctx.fillStyle=hGrad; ctx.fill();
     ctx.beginPath(); ctx.arc(cx,cy,r+5,0,Math.PI*2); ctx.strokeStyle='rgba(255,255,255,0.65)'; ctx.lineWidth=2.5; ctx.stroke();
+    // Lv4以上（2個で消える）は右上に⭐バッジを表示
+    if (fruit.level >= 4) this._drawStarBadge(ctx, cx, cy, r);
+  }
+
+  _drawStarBadge(ctx, cx, cy, r) {
+    const bx = cx + r * 0.62, by = cy - r * 0.62;
+    const br = Math.max(7, r * 0.28);
+    ctx.save();
+    // 白い縁取り円
+    ctx.beginPath(); ctx.arc(bx, by, br + 2, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.fill();
+    // 金色の丸バッジ
+    const gGrad = ctx.createRadialGradient(bx - br * 0.2, by - br * 0.2, 0, bx, by, br);
+    gGrad.addColorStop(0, '#FFE566'); gGrad.addColorStop(1, '#FFB300');
+    ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2);
+    ctx.fillStyle = gGrad; ctx.fill();
+    // ⭐ 星を描画
+    ctx.save();
+    ctx.translate(bx, by);
+    ctx.fillStyle = '#FFF8E1';
+    const sp = 5, ip = 2.5, starR = br * 0.62;
+    ctx.beginPath();
+    for (let i = 0; i < sp * 2; i++) {
+      const angle = (i * Math.PI) / sp - Math.PI / 2;
+      const rad   = i % 2 === 0 ? starR : starR * 0.42;
+      i === 0 ? ctx.moveTo(Math.cos(angle) * rad, Math.sin(angle) * rad)
+              : ctx.lineTo(Math.cos(angle) * rad, Math.sin(angle) * rad);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.restore();
   }
 
   _drawDetails(ctx,cx,cy,r,level,color){
