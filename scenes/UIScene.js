@@ -638,6 +638,10 @@ class UIScene extends Phaser.Scene {
           localStorage.setItem('fruitBubblePlayerName', newName);
           nameTxt.setText(`👤 名前変更（${newName}）`);
           _showDone(`「${newName}」で保存しました`);
+        } else {
+          localStorage.removeItem('fruitBubblePlayerName');
+          nameTxt.setText('👤 プレイヤー名を設定');
+          _showDone('プレイヤー名を削除しました');
         }
         inp.remove();
         saveBtn.remove();
