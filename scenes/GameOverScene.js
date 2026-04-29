@@ -358,10 +358,6 @@ class GameOverScene extends Phaser.Scene {
     }
   }
 
-    submitDom.addEventListener('click', doSubmit);
-    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSubmit(); });
-  }
-
   _removeNameInput() {
     if (this._nameInput) { this._nameInput.remove();  this._nameInput = null; }
     if (this._submitDom) { this._submitDom.remove();  this._submitDom = null; }
