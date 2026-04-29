@@ -6,7 +6,7 @@ const config = {
   height: 720,
   parent: 'game-container',
   backgroundColor: '#FFF5F9',
-  scene: [GameScene, UIScene, GameOverScene],
+  scene: [GameScene, UIScene, GameOverScene, RankingScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

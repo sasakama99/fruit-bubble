@@ -10,102 +10,73 @@ class UIScene extends Phaser.Scene {
     this.soundOn   = localStorage.getItem('fruitBubbleSound') !== 'off';
     const tx = window.t();
 
-    // ── スコア（ディープピンク）
-    this.scoreText = this.add.text(14, 14, `${tx.score}: 0`, {
-      fontSize: '22px', fontFamily: 'Arial',
-      color: '#A0397A', stroke: '#fff', strokeThickness: 3,
+    // ── スコア（大きく・鮮やか）
+    this.scoreText = this.add.text(12, 8, `${tx.score}: 0`, {
+      fontSize: '26px', fontFamily: 'Arial Black, Arial',
+      color: '#D81B60', stroke: '#fff', strokeThickness: 4,
     });
 
-    // ── ベストスコア（モーブ）
-    this.bestText = this.add.text(14, 44, `${tx.best}: ${this.bestScore.toLocaleString()}`, {
-      fontSize: '14px', fontFamily: 'Arial',
-      color: '#B06090', stroke: '#fff', strokeThickness: 2,
+    // ── ベストスコア
+    this.bestText = this.add.text(12, 46, `${tx.best}: ${this.bestScore.toLocaleString()}`, {
+      fontSize: '15px', fontFamily: 'Arial',
+      color: '#AD1457', stroke: '#fff', strokeThickness: 2,
     });
 
-    // ── 言語切替ボタン（左下）
-    this.langBtnText = this.add.text(14, 74, tx.langBtn, {
-      fontSize: '11px', fontFamily: 'Arial',
-      color: '#C06090', stroke: '#fff', strokeThickness: 1,
-      backgroundColor: '#FFE4EE',
-      padding: { x: 5, y: 2 },
-    }).setInteractive({ cursor: 'pointer' });
-    this.langBtnText.on('pointerover', () => this.langBtnText.setStyle({ color: '#FF6BAE' }));
-    this.langBtnText.on('pointerout',  () => this.langBtnText.setStyle({ color: '#C06090' }));
-    this.langBtnText.on('pointerdown', () => this._switchLang());
+    // ── ボタン共通スタイル（y=74）
+    const _btn = (x, label, onClick) => {
+      const b = this.add.text(x, 74, label, {
+        fontSize: '15px', fontFamily: 'Arial',
+        color: '#fff', stroke: '#C0006A', strokeThickness: 2,
+        backgroundColor: '#F06292',
+        padding: { x: 7, y: 4 },
+      }).setInteractive({ cursor: 'pointer' });
+      b.on('pointerover', () => b.setStyle({ backgroundColor: '#FF80AB' }));
+      b.on('pointerout',  () => b.setStyle({ backgroundColor: '#F06292' }));
+      b.on('pointerdown', onClick);
+      return b;
+    };
 
-    // ── リスタートボタン（言語ボタンの右隣）
-    this.restartBtnText = this.add.text(70, 74, tx.restartBtn, {
-      fontSize: '14px', fontFamily: 'Arial',
-      color: '#C06090', stroke: '#fff', strokeThickness: 1,
-      backgroundColor: '#FFE4EE',
-      padding: { x: 5, y: 2 },
-    }).setInteractive({ cursor: 'pointer' });
-    this.restartBtnText.on('pointerover', () => this.restartBtnText.setStyle({ color: '#FF6BAE' }));
-    this.restartBtnText.on('pointerout',  () => this.restartBtnText.setStyle({ color: '#C06090' }));
-    this.restartBtnText.on('pointerdown', () => this._showRestartConfirm());
+    this.langBtnText     = _btn(  8, tx.langBtn,     () => this._switchLang());
+    this.restartBtnText  = _btn( 60, tx.restartBtn,  () => this._showRestartConfirm());
+    this.badgeBtnText    = _btn( 96, tx.badgeBtn,    () => this._showBadgePanel());
+    this.rankingBtnText  = _btn(130, tx.rankingBtn,  () => this._showRanking());
+    this.helpBtnText     = _btn(162, tx.helpBtn,     () => this._showHelp());
+    this.settingsBtnText = _btn(196, tx.settingsBtn, () => this._showSettings());
 
-    // ── バッジボタン（ヘルプボタンの右隣）
-    this.badgeBtnText = this.add.text(134, 74, tx.badgeBtn, {
-      fontSize: '13px', fontFamily: 'Arial',
-      color: '#C06090', stroke: '#fff', strokeThickness: 1,
-      backgroundColor: '#FFE4EE',
-      padding: { x: 6, y: 2 },
-    }).setInteractive({ cursor: 'pointer' });
-    this.badgeBtnText.on('pointerover', () => this.badgeBtnText.setStyle({ color: '#FF6BAE' }));
-    this.badgeBtnText.on('pointerout',  () => this.badgeBtnText.setStyle({ color: '#C06090' }));
-    this.badgeBtnText.on('pointerdown', () => this._showBadgePanel());
+    // ── ポーズ・音量ボタン（横並び・右端）
+    const _iconBtn = (x, y, label, fontSize, onDown) => {
+      const box = this.add.rectangle(x, y, 40, 40, 0xFF4081, 1)
+        .setStrokeStyle(2, 0xC2185B).setInteractive({ cursor: 'pointer' }).setOrigin(0.5);
+      const txt = this.add.text(x, y, label, {
+        fontSize, fontFamily: 'Arial', color: '#fff',
+        stroke: '#9C0042', strokeThickness: 2,
+      }).setOrigin(0.5);
+      box.on('pointerover', () => box.setFillStyle(0xFF80AB));
+      box.on('pointerout',  () => box.setFillStyle(0xFF4081));
+      box.on('pointerdown', onDown);
+      return { box, txt };
+    };
 
-    // ── ヘルプボタン（バッジボタンの右隣）
-    this.helpBtnText = this.add.text(168, 74, tx.helpBtn, {
-      fontSize: '13px', fontFamily: 'Arial',
-      color: '#C06090', stroke: '#fff', strokeThickness: 1,
-      backgroundColor: '#FFE4EE',
-      padding: { x: 6, y: 2 },
-    }).setInteractive({ cursor: 'pointer' });
-    this.helpBtnText.on('pointerover', () => this.helpBtnText.setStyle({ color: '#FF6BAE' }));
-    this.helpBtnText.on('pointerout',  () => this.helpBtnText.setStyle({ color: '#C06090' }));
-    this.helpBtnText.on('pointerdown', () => this._showHelp());
+    // ── NEXT エリア（排出フルーツx=240 と 一時停止x=415 の中間 = x=327）
+    this.add.rectangle(327, 50, 74, 88, 0xFFB3D9, 0.45)
+      .setStrokeStyle(2, 0xFF6BAE).setOrigin(0.5);
 
-    // ── 設定ボタン（ヘルプの右隣）
-    this.settingsBtnText = this.add.text(202, 74, tx.settingsBtn, {
-      fontSize: '13px', fontFamily: 'Arial',
-      color: '#C06090', stroke: '#fff', strokeThickness: 1,
-      backgroundColor: '#FFE4EE',
-      padding: { x: 6, y: 2 },
-    }).setInteractive({ cursor: 'pointer' });
-    this.settingsBtnText.on('pointerover', () => this.settingsBtnText.setStyle({ color: '#FF6BAE' }));
-    this.settingsBtnText.on('pointerout',  () => this.settingsBtnText.setStyle({ color: '#C06090' }));
-    this.settingsBtnText.on('pointerdown', () => this._showSettings());
-
-    // ── NEXT ラベル
-    this.nextLabel = this.add.text(370, 12, tx.next, {
-      fontSize: '13px', fontFamily: 'Arial',
-      color: '#C06090', stroke: '#fff', strokeThickness: 2,
+    this.nextLabel = this.add.text(327, 14, tx.next, {
+      fontSize: '15px', fontFamily: 'Arial Black, Arial',
+      color: '#C2185B', stroke: '#fff', strokeThickness: 3,
     }).setOrigin(0.5);
 
-    // ── NEXT フルーツ
-    this.nextImg = this.add.image(370, 62, 'fruit_1').setOrigin(0.5).setScale(0.65);
+    this.nextImg = this.add.image(327, 57, 'fruit_1').setOrigin(0.5).setScale(0.65);
 
-    // ── ポーズボタン（ピンク）
-    const pauseBox = this.add.rectangle(448, 20, 36, 36, 0xFF8FB8, 0.9)
-      .setStrokeStyle(2, 0xFF6B9D).setInteractive({ cursor: 'pointer' }).setOrigin(0.5);
-    this.pauseLabel = this.add.text(448, 20, '||', {
-      fontSize: '16px', fontFamily: 'Arial', color: '#fff',
-    }).setOrigin(0.5);
-    pauseBox.on('pointerover', () => pauseBox.setFillStyle(0xFFB3CE, 0.9));
-    pauseBox.on('pointerout',  () => pauseBox.setFillStyle(0xFF8FB8, 0.9));
-    pauseBox.on('pointerdown', () => this._togglePause());
+    // ── ポーズ・音量ボタン（横並び・右端）
+    const pause = _iconBtn(415, 50, '||', '17px', () => this._togglePause());
+    this.pauseLabel = pause.txt;
+    this.pauseBox   = pause.box;
 
-    // ── 音量ボタン（ピンク）
-    const soundBox = this.add.rectangle(448, 62, 36, 36, 0xFF8FB8, 0.9)
-      .setStrokeStyle(2, 0xFF6B9D).setInteractive({ cursor: 'pointer' }).setOrigin(0.5);
-    this.soundLabel = this.add.text(448, 62, '♪', {
-      fontSize: '18px', fontFamily: 'Arial', color: '#fff',
-    }).setOrigin(0.5);
-    soundBox.on('pointerover', () => soundBox.setFillStyle(0xFFB3CE, 0.9));
-    soundBox.on('pointerout',  () => soundBox.setFillStyle(0xFF8FB8, 0.9));
-    soundBox.on('pointerdown', () => this._toggleSound());
-    // 保存済み設定を即時反映
+    const sound = _iconBtn(460, 50, '♪', '20px', () => this._toggleSound());
+    this.soundLabel = sound.txt;
+    this.soundBox   = sound.box;
+
     if (!this.soundOn) {
       this.soundLabel.setText('✕');
       this.sound.setMute(true);
@@ -146,9 +117,11 @@ class UIScene extends Phaser.Scene {
     }
   }
 
-  setNext(level) {
+  setNext(texKey) {
     if (!this.nextImg || !this.nextImg.scene) return;
-    this.nextImg.setTexture(`fruit_${level}`);
+    if (this.textures && this.textures.exists(texKey)) {
+      this.nextImg.setTexture(texKey);
+    }
   }
 
   // フィーバーバーを表示してカウントダウン
@@ -704,5 +677,13 @@ class UIScene extends Phaser.Scene {
 
     confirmObjs.forEach(o => o.setAlpha(0));
     this.tweens.add({ targets: confirmObjs, alpha: 1, duration: 150 });
+  }
+
+  // ── ランキング表示 ─────────────────────────────────────────
+  _showRanking() {
+    if (this.scene.isActive('RankingScene')) return;
+    const gs = this.scene.get('GameScene');
+    const myScore = gs ? gs.score : null;
+    this.scene.launch('RankingScene', { myScore, period: 'daily' });
   }
 }

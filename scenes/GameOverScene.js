@@ -26,14 +26,15 @@ class GameOverScene extends Phaser.Scene {
     this.tweens.add({ targets: overlay, alpha: 0.5, duration: 400 });
 
     // パネル（下から飛び上がる）
-    const panel = this.add.rectangle(240, 900, 340, 490, 0xFFF0F8, 1)
+    const panel = this.add.rectangle(240, 900, 340, 560, 0xFFF0F8, 1)
       .setStrokeStyle(4, 0xFF8FB8).setDepth(1);
     this.tweens.add({
-      targets: panel, y: 360,
+      targets: panel, y: 370,
       duration: 450, ease: 'Back.easeOut',
     });
 
     this.time.delayedCall(200, () => this._buildUI(currentRank, panel, tx));
+    this._nameInput = null; // DOM input の参照を保持
   }
 
   _buildUI(rank, panel, tx) {
@@ -106,19 +107,23 @@ class GameOverScene extends Phaser.Scene {
       this.tweens.add({ targets: nextTxt, alpha: 1, duration: 300, delay: 500 });
     }
 
+    // ── ランキング登録ボタン（Firebase が有効な時のみ表示）
+    this._buildRankingBlock(tx, panel);
+
     // ── リバイブボタン（動画広告で復活）— 1プレイ1回限り
-    const reviveY = 398;
+    const reviveY = 440;
     const revBtnColor = this.reviveAvailable ? 0xF9A825 : 0xBDBDBD;
-    const revBtn = this.add.rectangle(240, reviveY, 260, 50, revBtnColor, 1)
+    const revBtn = this.add.rectangle(240, reviveY, 280, 54, revBtnColor, 1)
       .setStrokeStyle(2, this.reviveAvailable ? 0xF57F17 : 0x9E9E9E)
       .setDepth(2).setAlpha(0);
     if (this.reviveAvailable) revBtn.setInteractive({ cursor: 'pointer' });
 
     const revBtnLabel = this.reviveAvailable ? tx.reviveBtn : '📺 復活は1プレイ1回のみ';
     const revBtnTxt = this.add.text(240, reviveY, revBtnLabel, {
-      fontSize: this.reviveAvailable ? '15px' : '12px', fontFamily: 'Arial',
-      color: this.reviveAvailable ? '#fff' : '#aaa',
-      stroke: this.reviveAvailable ? '#5D4037' : '#888', strokeThickness: 2,
+      fontSize: this.reviveAvailable ? '17px' : '14px', fontFamily: 'Arial',
+      fontStyle: 'bold',
+      color: this.reviveAvailable ? '#fff' : '#888',
+      stroke: this.reviveAvailable ? '#5D4037' : '#666', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(3).setAlpha(0);
     this.tweens.add({ targets: [revBtn, revBtnTxt], alpha: 1, duration: 300, delay: 550 });
 
@@ -147,11 +152,11 @@ class GameOverScene extends Phaser.Scene {
     }
 
     // ── リトライボタン（ピンク）
-    const btn = this.add.rectangle(240, 460, 210, 48, 0xFF8FB8, 1)
+    const btn = this.add.rectangle(240, 506, 240, 50, 0xFF8FB8, 1)
       .setStrokeStyle(2, 0xFF6B9D).setInteractive({ cursor: 'pointer' }).setDepth(2).setAlpha(0);
-    const btnTxt = this.add.text(240, 460, tx.playAgain, {
-      fontSize: '18px', fontFamily: 'Arial',
-      color: '#fff', stroke: '#C0006A', strokeThickness: 2,
+    const btnTxt = this.add.text(240, 506, tx.playAgain, {
+      fontSize: '20px', fontFamily: 'Arial', fontStyle: 'bold',
+      color: '#fff', stroke: '#C0006A', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(3).setAlpha(0);
     this.tweens.add({ targets: [btn, btnTxt], alpha: 1, duration: 300, delay: 650 });
 
@@ -172,7 +177,7 @@ class GameOverScene extends Phaser.Scene {
     });
 
     // シェアボタン
-    const shareBtn = this.add.text(240, 514, tx.share, {
+    const shareBtn = this.add.text(240, 548, tx.share, {
       fontSize: '13px', fontFamily: 'Arial',
       color: '#1976D2', stroke: '#fff', strokeThickness: 1,
     }).setOrigin(0.5).setDepth(2).setAlpha(0).setInteractive({ cursor: 'pointer' });
@@ -223,5 +228,126 @@ class GameOverScene extends Phaser.Scene {
       // 3) レガシー execCommand コピー
       legacyCopy();
     });
+  }
+
+  // ── ランキング登録ブロック ─────────────────────────────────
+  _buildRankingBlock(tx, panel) {
+    if (!window.FB_READY) return;  // Firebase 未設定なら非表示
+
+    const score = this.finalScore;
+    if (score <= 0) return;
+
+    const PERIODS = ['daily', 'weekly', 'monthly'];
+    const rankY   = 398;
+
+    // ランキングボタン
+    const rankBtn = this.add.rectangle(240, rankY, 280, 38, 0x7B1FA2, 1)
+      .setStrokeStyle(2, 0x4A0072).setDepth(2).setAlpha(0).setInteractive({ cursor: 'pointer' });
+    const rankTxtBtn = this.add.text(240, rankY, tx.rankingRegister, {
+      fontSize: '15px', fontFamily: 'Arial', fontStyle: 'bold',
+      color: '#fff', stroke: '#4A0072', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(3).setAlpha(0);
+    this.tweens.add({ targets: [rankBtn, rankTxtBtn], alpha: 1, duration: 300, delay: 520 });
+
+    rankBtn.on('pointerover', () => rankBtn.setFillStyle(0x9C27B0));
+    rankBtn.on('pointerout',  () => rankBtn.setFillStyle(0x7B1FA2));
+    rankBtn.on('pointerdown', () => {
+      rankBtn.disableInteractive();
+      this._showNameInput(rankBtn, rankTxtBtn, tx, score, PERIODS, panel);
+    });
+  }
+
+  _showNameInput(rankBtn, rankTxtBtn, tx, score, periods) {
+    this._removeNameInput();
+
+    rankTxtBtn.setText(tx.rankingNameLabel).setFontSize('13px');
+    rankBtn.setFillStyle(0xCE93D8).setStrokeStyle(1, 0x9C27B0);
+
+    const canvas  = this.game.canvas;
+    const rect    = canvas.getBoundingClientRect();
+    const scaleX  = rect.width  / 480;
+    const scaleY  = rect.height / 720;
+    const baseY   = 398;
+
+    const inp = document.createElement('input');
+    inp.type        = 'text';
+    inp.maxLength   = 8;
+    inp.placeholder = tx.rankingNamePlaceholder;
+    inp.style.cssText = [
+      `position:fixed`,
+      `left:${rect.left + 90 * scaleX}px`,
+      `top:${rect.top  + (baseY + 22) * scaleY}px`,
+      `width:${185 * scaleX}px`,
+      `height:${34 * scaleY}px`,
+      `font-size:${16 * Math.min(scaleX, scaleY)}px`,
+      `border:2px solid #CE93D8`,
+      `border-radius:8px`,
+      `padding:0 8px`,
+      `text-align:center`,
+      `outline:none`,
+      `z-index:9999`,
+    ].join(';');
+
+    const submitDom = document.createElement('button');
+    submitDom.textContent = tx.rankingNameBtn;
+    submitDom.style.cssText = [
+      `position:fixed`,
+      `left:${rect.left + 285 * scaleX}px`,
+      `top:${rect.top  + (baseY + 22) * scaleY}px`,
+      `width:${80 * scaleX}px`,
+      `height:${34 * scaleY}px`,
+      `font-size:${14 * Math.min(scaleX, scaleY)}px`,
+      `background:#7B1FA2`,
+      `color:#fff`,
+      `border:none`,
+      `border-radius:8px`,
+      `cursor:pointer`,
+      `font-weight:bold`,
+      `z-index:9999`,
+    ].join(';');
+
+    document.body.appendChild(inp);
+    document.body.appendChild(submitDom);
+    this._nameInput = inp;
+    this._submitDom = submitDom;
+    inp.focus();
+
+    const doSubmit = async () => {
+      const name = (inp.value || '').trim();
+      if (!name) { inp.focus(); return; }
+      submitDom.disabled = true;
+      this._removeNameInput();
+      rankTxtBtn.setText('⏳ 送信中...').setFontSize('14px');
+      try {
+        const results = await Promise.all(
+          periods.map(p => window.RankingAPI.submit(p, name, score))
+        );
+        const ok = results.some(r => r);
+        rankBtn.setFillStyle(ok ? 0x4CAF50 : 0xBDBDBD);
+        rankTxtBtn.setText(ok ? tx.rankingRegistered : '圏外でした')
+          .setStyle({ color: ok ? '#fff' : '#888', fontSize: '14px' });
+        if (ok) {
+          this.time.delayedCall(1000, () => {
+            if (!this.scene || !this.scene.isActive('GameOverScene')) return;
+            this.scene.launch('RankingScene', { myScore: score, period: 'daily' });
+          });
+        }
+      } catch (e) {
+        rankBtn.setFillStyle(0xBDBDBD);
+        rankTxtBtn.setText(tx.rankingFailed).setStyle({ color: '#888', fontSize: '14px' });
+      }
+    };
+
+    submitDom.addEventListener('click', doSubmit);
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSubmit(); });
+  }
+
+  _removeNameInput() {
+    if (this._nameInput) { this._nameInput.remove();  this._nameInput = null; }
+    if (this._submitDom) { this._submitDom.remove();  this._submitDom = null; }
+  }
+
+  shutdown() {
+    this._removeNameInput();
   }
 }

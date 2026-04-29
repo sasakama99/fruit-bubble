@@ -117,7 +117,8 @@ class GameScene extends Phaser.Scene {
       this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     } catch (e) { this.audioCtx = null; }
 
-    this.nextLevel = this._randomLevel();
+    this.nextLevel  = this._randomLevel();
+    this.nextTexKey = this._randFruitKey(this.nextLevel);
 
     // BGM 開始（シーン再起動時は一旦全停止）
     this.sound.stopAll();
@@ -163,16 +164,18 @@ class GameScene extends Phaser.Scene {
   _spawnCurrent() {
     if (this.state === 'GAME_OVER') return;
 
-    this.currentLevel = this.nextLevel;
-    this.nextLevel    = this._randomLevel();
-    this.state        = 'WAITING';
-    this.combo        = 0;
+    this.currentLevel  = this.nextLevel;
+    this.currentTexKey = this.nextTexKey;
+    this.nextLevel     = this._randomLevel();
+    this.nextTexKey    = this._randFruitKey(this.nextLevel);
+    this.state         = 'WAITING';
+    this.combo         = 0;
 
     if (this.bobTween) { this.bobTween.stop(); this.bobTween = null; }
     if (this.currentSprite) this.currentSprite.destroy();
 
     const scale = this._fruitScale(this.currentLevel) * 1.1;
-    this.currentSprite = this.add.image(GAME_W / 2, 58, `fruit_${this.currentLevel}`)
+    this.currentSprite = this.add.image(GAME_W / 2, 58, this.currentTexKey)
       .setOrigin(0.5).setScale(0).setDepth(10);
 
     this.tweens.add({
@@ -540,7 +543,7 @@ class GameScene extends Phaser.Scene {
               this.grid[col].length
             );
             const spr = this.add.image(
-              this._laneX(col), this._rowY(insertRow), `fruit_${i.level}`
+              this._laneX(col), this._rowY(insertRow), this._randFruitKey(i.level)
             ).setOrigin(0.5).setScale(0).setDepth(5);
             this.grid[col].splice(insertRow, 0, i.level);
             this.gridSprites[col].splice(insertRow, 0, spr);
@@ -557,7 +560,7 @@ class GameScene extends Phaser.Scene {
           for (const i of topIns) {
             const insertRow = this.grid[col].length;
             const spr = this.add.image(
-              this._laneX(col), this._rowY(insertRow), `fruit_${i.level}`
+              this._laneX(col), this._rowY(insertRow), this._randFruitKey(i.level)
             ).setOrigin(0.5).setScale(0).setDepth(5);
             this.grid[col].push(i.level);
             this.gridSprites[col].push(spr);
@@ -724,7 +727,7 @@ class GameScene extends Phaser.Scene {
         const newLevel2 = newLevel;
         const newScale  = this._fruitScale(newLevel2);
         const newSprite = this.add.image(
-          this._laneX(col), this._rowY(startRow), `fruit_${newLevel2}`
+          this._laneX(col), this._rowY(startRow), this._randFruitKey(newLevel2)
         ).setOrigin(0.5).setScale(0).setDepth(5);
 
         this.grid[col].splice(startRow, 0, newLevel2);
@@ -802,7 +805,7 @@ class GameScene extends Phaser.Scene {
 
         this.time.delayedCall(160, () => {
           const newSprite = this.add.image(
-            this._laneX(centerCol), this._rowY(newRow), `fruit_${newLevel}`
+            this._laneX(centerCol), this._rowY(newRow), this._randFruitKey(newLevel)
           ).setOrigin(0.5).setScale(0).setDepth(5);
 
           this.grid[centerCol].push(newLevel);
@@ -1289,7 +1292,8 @@ class GameScene extends Phaser.Scene {
     this._resumeInputAfterRevive();
 
     // 新しいフルーツをスポーン
-    this.nextLevel = this._randomLevel();
+    this.nextLevel  = this._randomLevel();
+    this.nextTexKey = this._randFruitKey(this.nextLevel);
     this._spawnCurrent();
 
     // 下押し出しタイマー再起動
@@ -1387,7 +1391,7 @@ class GameScene extends Phaser.Scene {
       const by    = GAME_H - FOOTER_H / 2 + 6;
       const scale = this._fruitScale(level) * 0.85;
 
-      const spr = this.add.image(bx, GAME_H + 60, `fruit_${level}`)
+      const spr = this.add.image(bx, GAME_H + 60, this._randFruitKey(level))
         .setOrigin(0.5).setScale(scale).setDepth(6);
 
       // 下から飛び出すポップイン
@@ -1568,7 +1572,7 @@ class GameScene extends Phaser.Scene {
     const ui = this.scene.get('UIScene');
     if (!ui || !ui.scoreText) return;
     ui.setScore(this.score);
-    ui.setNext(this.nextLevel);
+    ui.setNext(this.nextTexKey || `fruit_${this.nextLevel}_v0`);
   }
 
   // ============================================================
@@ -1618,22 +1622,24 @@ class GameScene extends Phaser.Scene {
     gfx.beginPath(); gfx.moveTo(0, DANGER_Y); gfx.lineTo(GAME_W, DANGER_Y); gfx.strokePath();
 
     this.dangerText = this.add.text(4, DANGER_Y + 2, window.t().danger, {
-      fontSize: '9px', fontFamily: 'Arial', color: '#FF6BAE',
+      fontSize: '11px', fontFamily: 'Arial', fontStyle: 'bold',
+      color: '#FF6BAE', stroke: '#fff', strokeThickness: 1,
     });
-    this.tapHintText = this.add.text(GAME_W/2, 88, window.t().tapHint, {
-      fontSize: '11px', fontFamily: 'Arial',
+    // tapHintはヘッダー下（フィールド内上部）に配置してボタン列との重なりを回避
+    this.tapHintText = this.add.text(GAME_W/2, HEADER_H + 14, window.t().tapHint, {
+      fontSize: '13px', fontFamily: 'Arial',
       color: '#C06090', stroke: '#fff', strokeThickness: 2,
-    }).setOrigin(0.5).setAlpha(0.9);
+    }).setOrigin(0.5).setAlpha(0.85);
 
     // フッター：ラベル（動的に更新）
-    this.pushCountLabel = this.add.text(10, GAME_H - FOOTER_H + 5, window.t().pushNext, {
-      fontSize: '10px', fontFamily: 'Arial',
-      color: '#C06090', stroke: '#fff', strokeThickness: 1,
+    this.pushCountLabel = this.add.text(10, GAME_H - FOOTER_H + 4, window.t().pushNext, {
+      fontSize: '14px', fontFamily: 'Arial', fontStyle: 'bold',
+      color: '#C06090', stroke: '#fff', strokeThickness: 2,
     }).setDepth(5);
 
     // カウントダウンテキスト（右端）
-    this.pushTimerText = this.add.text(GAME_W - 8, GAME_H - FOOTER_H + 5, '10s', {
-      fontSize: '12px', fontFamily: 'Arial',
+    this.pushTimerText = this.add.text(GAME_W - 8, GAME_H - FOOTER_H + 4, '10s', {
+      fontSize: '15px', fontFamily: 'Arial', fontStyle: 'bold',
       color: '#A0407A', stroke: '#fff', strokeThickness: 2,
     }).setOrigin(1, 0).setDepth(5);
 
@@ -1667,23 +1673,37 @@ class GameScene extends Phaser.Scene {
   }
 
   // ============================================================
-  //  フルーツテクスチャ生成（Step3 から変更なし）
+  //  フルーツテクスチャ生成 — 表情バリアント×6種類
   // ============================================================
+  static get EXPR_COUNT() { return 6; }
+
+  // ランダムな表情付きテクスチャキーを返す
+  _randFruitKey(level) {
+    const v = Phaser.Math.Between(0, GameScene.EXPR_COUNT - 1);
+    return `fruit_${level}_v${v}`;
+  }
+
   _buildFruitTextures() {
     FRUITS.forEach(fruit => {
-      // リスタート時に既存テクスチャを上書きしない
-      if (this.textures.exists(`fruit_${fruit.level}`)) return;
-      const pad  = 18;
-      const side = fruit.size + pad * 2;
-      const tex  = this.textures.createCanvas(`fruit_${fruit.level}`, side, side);
-      const ctx  = tex.context;
-      const cx   = side / 2, cy = side / 2, r = fruit.size / 2;
-      fruit.level === 8 ? this._drawRainbow(ctx, cx, cy, r) : this._drawStdFruit(ctx, cx, cy, r, fruit);
-      tex.refresh();
+      for (let v = 0; v < GameScene.EXPR_COUNT; v++) {
+        const key = `fruit_${fruit.level}_v${v}`;
+        if (this.textures.exists(key)) this.textures.remove(key);
+        const pad  = 18;
+        const side = fruit.size + pad * 2;
+        const tex  = this.textures.createCanvas(key, side, side);
+        const ctx  = tex.context;
+        const cx   = side / 2, cy = side / 2, r = fruit.size / 2;
+        if (fruit.level === 8) {
+          this._drawRainbow(ctx, cx, cy, r, v);
+        } else {
+          this._drawStdFruit(ctx, cx, cy, r, fruit, v);
+        }
+        tex.refresh();
+      }
     });
   }
 
-  _drawStdFruit(ctx, cx, cy, r, fruit) {
+  _drawStdFruit(ctx, cx, cy, r, fruit, expr = 0) {
     const bGrad = ctx.createRadialGradient(cx, cy, r*.55, cx, cy, r+14);
     bGrad.addColorStop(0,'rgba(255,255,255,0)'); bGrad.addColorStop(.75,'rgba(255,255,255,0.12)'); bGrad.addColorStop(1,'rgba(255,255,255,0.55)');
     ctx.beginPath(); ctx.arc(cx,cy,r+14,0,Math.PI*2); ctx.fillStyle=bGrad; ctx.fill();
@@ -1691,7 +1711,7 @@ class GameScene extends Phaser.Scene {
     fGrad.addColorStop(0,lighter(fruit.color,70)); fGrad.addColorStop(.55,fruit.color); fGrad.addColorStop(1,darker(fruit.color,45));
     ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fillStyle=fGrad; ctx.fill();
     this._drawDetails(ctx,cx,cy,r,fruit.level,fruit.color);
-    this._drawFace(ctx,cx,cy,r);
+    this._drawFace(ctx,cx,cy,r,expr);
     const hGrad=ctx.createRadialGradient(cx-r*.3,cy-r*.3,0,cx-r*.3,cy-r*.3,r*.28);
     hGrad.addColorStop(0,'rgba(255,255,255,0.85)'); hGrad.addColorStop(1,'rgba(255,255,255,0)');
     ctx.beginPath(); ctx.arc(cx-r*.3,cy-r*.3,r*.28,0,Math.PI*2); ctx.fillStyle=hGrad; ctx.fill();
@@ -1776,20 +1796,90 @@ class GameScene extends Phaser.Scene {
     ctx.restore();
   }
 
-  _drawFace(ctx,cx,cy,r){
-    const eyeY=cy+r*.10,eyeR=Math.max(2.2,r*.08),eyeOX=r*.26;
-    ctx.save();ctx.fillStyle='#333333';
-    ctx.beginPath();ctx.arc(cx-eyeOX,eyeY,eyeR,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(cx+eyeOX,eyeY,eyeR,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='rgba(255,150,150,0.4)';
-    ctx.beginPath();ctx.ellipse(cx-eyeOX-r*.06,eyeY+r*.14,r*.12,r*.07,0,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.ellipse(cx+eyeOX+r*.06,eyeY+r*.14,r*.12,r*.07,0,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='#333333';ctx.lineWidth=Math.max(1.5,r*.065);ctx.lineCap='round';
-    ctx.beginPath();ctx.arc(cx,eyeY+r*.14,r*.22,0.05,Math.PI-0.05);ctx.stroke();
+  // expr: 0=普通, 1=細目笑い, 2=真剣, 3=びっくり, 4=閉じ目やさしい, 5=大笑い歯あり
+  _drawFace(ctx, cx, cy, r, expr = 0) {
+    ctx.save();
+    const eyeY  = cy + r * 0.10;
+    const eyeOX = r * 0.26;
+    const eyeR  = Math.max(2.2, r * 0.08);
+    const lw    = Math.max(1.5, r * 0.065);
+
+    const cheeks = (alpha = 0.38) => {
+      ctx.fillStyle = `rgba(255,130,150,${alpha})`;
+      ctx.beginPath(); ctx.ellipse(cx-eyeOX-r*.06, eyeY+r*.16, r*.13, r*.075, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx+eyeOX+r*.06, eyeY+r*.16, r*.13, r*.075, 0, 0, Math.PI*2); ctx.fill();
+    };
+
+    ctx.fillStyle = '#333';
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = lw;
+    ctx.lineCap = 'round';
+
+    switch (expr % 6) {
+      case 0: { // 普通（丸目 + にっこり）
+        ctx.beginPath(); ctx.arc(cx-eyeOX, eyeY, eyeR, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx+eyeOX, eyeY, eyeR, 0, Math.PI*2); ctx.fill();
+        cheeks(0.38);
+        ctx.beginPath(); ctx.arc(cx, eyeY+r*.16, r*.22, 0.05, Math.PI-0.05); ctx.stroke();
+        break;
+      }
+      case 1: { // 細目笑い（弧目 + 大笑い）
+        ctx.lineWidth = lw * 1.1;
+        ctx.beginPath(); ctx.arc(cx-eyeOX, eyeY, eyeR*1.1, Math.PI, 0); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx+eyeOX, eyeY, eyeR*1.1, Math.PI, 0); ctx.stroke();
+        cheeks(0.45);
+        ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.arc(cx, eyeY+r*.16, r*.26, 0.05, Math.PI-0.05); ctx.stroke();
+        break;
+      }
+      case 2: { // 真剣（眉 + 点目 + 一文字口）
+        ctx.lineWidth = lw * 0.9;
+        ctx.beginPath(); ctx.moveTo(cx-eyeOX-eyeR, eyeY-eyeR*2.2); ctx.lineTo(cx-eyeOX+eyeR, eyeY-eyeR*1.5); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx+eyeOX-eyeR, eyeY-eyeR*1.5); ctx.lineTo(cx+eyeOX+eyeR, eyeY-eyeR*2.2); ctx.stroke();
+        ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.arc(cx-eyeOX, eyeY, eyeR, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx+eyeOX, eyeY, eyeR, 0, Math.PI*2); ctx.fill();
+        cheeks(0.25);
+        ctx.beginPath(); ctx.moveTo(cx-r*.15, eyeY+r*.22); ctx.lineTo(cx+r*.15, eyeY+r*.22); ctx.stroke();
+        break;
+      }
+      case 3: { // びっくり（大丸目＋ポカーン）
+        const bEyeR = eyeR * 1.35;
+        ctx.beginPath(); ctx.arc(cx-eyeOX, eyeY, bEyeR, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx+eyeOX, eyeY, bEyeR, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(cx-eyeOX-bEyeR*.28, eyeY-bEyeR*.28, bEyeR*.32, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx+eyeOX-bEyeR*.28, eyeY-bEyeR*.28, bEyeR*.32, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#333';
+        cheeks(0.50);
+        ctx.beginPath(); ctx.arc(cx, eyeY+r*.24, r*.09, 0, Math.PI*2); ctx.fill();
+        break;
+      }
+      case 4: { // 閉じ目やさしい（下弧目 + ほわ笑顔）
+        ctx.lineWidth = lw * 1.1;
+        ctx.beginPath(); ctx.arc(cx-eyeOX, eyeY, eyeR*1.05, 0, Math.PI); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx+eyeOX, eyeY, eyeR*1.05, 0, Math.PI); ctx.stroke();
+        cheeks(0.50);
+        ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.arc(cx, eyeY+r*.16, r*.20, 0.2, Math.PI-0.2); ctx.stroke();
+        break;
+      }
+      case 5: { // 大笑い（三日月目 + 歯あり）
+        ctx.lineWidth = lw * 1.1;
+        ctx.beginPath(); ctx.arc(cx-eyeOX, eyeY+eyeR*.3, eyeR*1.1, Math.PI+0.3, -0.3); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx+eyeOX, eyeY+eyeR*.3, eyeR*1.1, Math.PI+0.3, -0.3); ctx.stroke();
+        cheeks(0.55);
+        ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.arc(cx, eyeY+r*.20, r*.28, 0.05, Math.PI-0.05); ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.rect(cx-r*.18, eyeY+r*.20, r*.36, r*.10); ctx.fill();
+        break;
+      }
+    }
     ctx.restore();
   }
 
-  _drawRainbow(ctx,cx,cy,r){
+  _drawRainbow(ctx,cx,cy,r,expr=0){
     const bGrad=ctx.createRadialGradient(cx,cy,r*.55,cx,cy,r+14);
     bGrad.addColorStop(0,'rgba(255,255,255,0)');bGrad.addColorStop(1,'rgba(255,255,255,0.55)');
     ctx.beginPath();ctx.arc(cx,cy,r+14,0,Math.PI*2);ctx.fillStyle=bGrad;ctx.fill();
@@ -1797,7 +1887,7 @@ class GameScene extends Phaser.Scene {
     ['#FF6B6B','#FFD93D','#6BCB77','#4D96FF','#C77DFF','#FF6B6B'].forEach((c,i,a)=>rGrad.addColorStop(i/(a.length-1),c));
     ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle=rGrad;ctx.fill();
     [[r*.58,-r*.50],[-r*.62,-r*.42],[r*.48,r*.58],[-r*.42,r*.62]].forEach(([dx,dy])=>this._drawStar(ctx,cx+dx,cy+dy,4,9));
-    this._drawFace(ctx,cx,cy,r);
+    this._drawFace(ctx,cx,cy,r,expr);
     const hGrad=ctx.createRadialGradient(cx-r*.3,cy-r*.3,0,cx-r*.3,cy-r*.3,r*.3);
     hGrad.addColorStop(0,'rgba(255,255,255,0.9)');hGrad.addColorStop(1,'rgba(255,255,255,0)');
     ctx.beginPath();ctx.arc(cx-r*.3,cy-r*.3,r*.3,0,Math.PI*2);ctx.fillStyle=hGrad;ctx.fill();
