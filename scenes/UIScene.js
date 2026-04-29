@@ -512,7 +512,7 @@ class UIScene extends Phaser.Scene {
       .setDepth(70).setInteractive();
 
     // パネル
-    const panel = this.add.rectangle(cx, cy, 300, 230, 0xFFF0F8, 1)
+    const panel = this.add.rectangle(cx, cy, 300, 300, 0xFFF0F8, 1)
       .setStrokeStyle(3, 0xFF8FB8).setDepth(71);
 
     // タイトル
@@ -570,10 +570,87 @@ class UIScene extends Phaser.Scene {
       );
     });
 
+    // ── プレイヤー名変更ボタン
+    const savedName = localStorage.getItem('fruitBubblePlayerName') || '';
+    const nameLabel = savedName ? `👤 名前変更（${savedName}）` : '👤 プレイヤー名を設定';
+    const nameBtn = this.add.rectangle(cx, cy + 98, 240, 46, 0xE8F4FD, 1)
+      .setStrokeStyle(2, 0x90CAF9).setInteractive({ cursor: 'pointer' }).setDepth(72);
+    const nameTxt = this.add.text(cx, cy + 98, nameLabel, {
+      fontSize: '13px', fontFamily: 'Arial',
+      color: '#1565C0', stroke: '#fff', strokeThickness: 1,
+    }).setOrigin(0.5).setDepth(73);
+    nameBtn.on('pointerover', () => nameBtn.setFillStyle(0xBBDEFB));
+    nameBtn.on('pointerout',  () => nameBtn.setFillStyle(0xE8F4FD));
+    nameBtn.on('pointerdown', () => {
+      // DOM input で名前入力
+      const canvas = this.game.canvas;
+      const rect   = canvas.getBoundingClientRect();
+      const scaleX = rect.width  / 480;
+      const scaleY = rect.height / 720;
+
+      const inp = document.createElement('input');
+      inp.type        = 'text';
+      inp.maxLength   = 8;
+      inp.value       = localStorage.getItem('fruitBubblePlayerName') || '';
+      inp.placeholder = 'プレイヤー名（8文字以内）';
+      inp.style.cssText = [
+        `position:fixed`,
+        `left:${rect.left + 90 * scaleX}px`,
+        `top:${rect.top  + (cy + 98 + 2) * scaleY}px`,
+        `width:${140 * scaleX}px`,
+        `height:${32 * scaleY}px`,
+        `font-size:${14 * Math.min(scaleX, scaleY)}px`,
+        `border:2px solid #90CAF9`,
+        `border-radius:8px`,
+        `padding:0 6px`,
+        `text-align:center`,
+        `outline:none`,
+        `z-index:9999`,
+      ].join(';');
+
+      const saveBtn = document.createElement('button');
+      saveBtn.textContent = '保存';
+      saveBtn.style.cssText = [
+        `position:fixed`,
+        `left:${rect.left + 238 * scaleX}px`,
+        `top:${rect.top  + (cy + 98 + 2) * scaleY}px`,
+        `width:${56 * scaleX}px`,
+        `height:${32 * scaleY}px`,
+        `font-size:${13 * Math.min(scaleX, scaleY)}px`,
+        `background:#1565C0`,
+        `color:#fff`,
+        `border:none`,
+        `border-radius:8px`,
+        `cursor:pointer`,
+        `font-weight:bold`,
+        `z-index:9999`,
+      ].join(';');
+
+      document.body.appendChild(inp);
+      document.body.appendChild(saveBtn);
+      nameBtn.disableInteractive();
+      inp.focus();
+      inp.select();
+
+      const doSave = () => {
+        const newName = (inp.value || '').trim();
+        if (newName) {
+          localStorage.setItem('fruitBubblePlayerName', newName);
+          nameTxt.setText(`👤 名前変更（${newName}）`);
+          _showDone(`「${newName}」で保存しました`);
+        }
+        inp.remove();
+        saveBtn.remove();
+        nameBtn.setInteractive({ cursor: 'pointer' });
+      };
+      saveBtn.addEventListener('click', doSave);
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSave(); });
+    });
+
     // 閉じるボタン
-    const closeBtn = this.add.rectangle(cx, cy + 95, 120, 36, 0xDDDDDD, 1)
+    const closeBtn = this.add.rectangle(cx, cy + 158, 120, 36, 0xDDDDDD, 1)
       .setStrokeStyle(2, 0xBBBBBB).setInteractive({ cursor: 'pointer' }).setDepth(72);
-    const closeTxt = this.add.text(cx, cy + 95, tx.settingsClose, {
+    const closeTxt = this.add.text(cx, cy + 158, tx.settingsClose, {
       fontSize: '14px', fontFamily: 'Arial',
       color: '#555', stroke: '#fff', strokeThickness: 1,
     }).setOrigin(0.5).setDepth(73);
@@ -581,7 +658,8 @@ class UIScene extends Phaser.Scene {
     closeBtn.on('pointerout',  () => closeBtn.setFillStyle(0xDDDDDD));
 
     const allObjs = [overlay, panel, title, note,
-                     bestBtn, bestTxt, badgeBtn, badgeTxt, closeBtn, closeTxt];
+                     bestBtn, bestTxt, badgeBtn, badgeTxt,
+                     nameBtn, nameTxt, closeBtn, closeTxt];
 
     const _close = () => {
       this.tweens.add({
