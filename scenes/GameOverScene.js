@@ -239,11 +239,15 @@ class GameOverScene extends Phaser.Scene {
 
     const PERIODS = ['daily', 'weekly', 'monthly'];
     const rankY   = 398;
+    const savedName = localStorage.getItem('fruitBubblePlayerName') || '';
+    const btnLabel = savedName
+      ? `🏆 ${savedName} で登録！`
+      : tx.rankingRegister;
 
     // ランキングボタン
     const rankBtn = this.add.rectangle(240, rankY, 280, 38, 0x7B1FA2, 1)
       .setStrokeStyle(2, 0x4A0072).setDepth(2).setAlpha(0).setInteractive({ cursor: 'pointer' });
-    const rankTxtBtn = this.add.text(240, rankY, tx.rankingRegister, {
+    const rankTxtBtn = this.add.text(240, rankY, btnLabel, {
       fontSize: '15px', fontFamily: 'Arial', fontStyle: 'bold',
       color: '#fff', stroke: '#4A0072', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(3).setAlpha(0);
@@ -253,7 +257,14 @@ class GameOverScene extends Phaser.Scene {
     rankBtn.on('pointerout',  () => rankBtn.setFillStyle(0x7B1FA2));
     rankBtn.on('pointerdown', () => {
       rankBtn.disableInteractive();
-      this._showNameInput(rankBtn, rankTxtBtn, tx, score, PERIODS, panel);
+      const savedName = localStorage.getItem('fruitBubblePlayerName') || '';
+      if (savedName) {
+        // 名前が保存済み → 即登録
+        this._doRegister(rankBtn, rankTxtBtn, tx, score, PERIODS, savedName);
+      } else {
+        // 初回のみ名前入力
+        this._showNameInput(rankBtn, rankTxtBtn, tx, score, PERIODS);
+      }
     });
   }
 
@@ -312,13 +323,22 @@ class GameOverScene extends Phaser.Scene {
     this._submitDom = submitDom;
     inp.focus();
 
-    const doSubmit = async () => {
+    const doSubmit = () => {
       const name = (inp.value || '').trim();
       if (!name) { inp.focus(); return; }
       submitDom.disabled = true;
       this._removeNameInput();
-      rankTxtBtn.setText('⏳ 送信中...').setFontSize('14px');
-      try {
+      localStorage.setItem('fruitBubblePlayerName', name); // 名前を保存
+      this._doRegister(rankBtn, rankTxtBtn, tx, score, periods, name);
+    };
+
+    submitDom.addEventListener('click', doSubmit);
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSubmit(); });
+  }
+
+  async _doRegister(rankBtn, rankTxtBtn, tx, score, periods, name) {
+    rankTxtBtn.setText('⏳ 送信中...').setFontSize('14px');
+    try {
         const results = await Promise.all(
           periods.map(p => window.RankingAPI.submit(p, name, score))
         );
@@ -332,11 +352,11 @@ class GameOverScene extends Phaser.Scene {
             this.scene.launch('RankingScene', { myScore: score, period: 'daily' });
           });
         }
-      } catch (e) {
-        rankBtn.setFillStyle(0xBDBDBD);
-        rankTxtBtn.setText(tx.rankingFailed).setStyle({ color: '#888', fontSize: '14px' });
-      }
-    };
+    } catch (e) {
+      rankBtn.setFillStyle(0xBDBDBD);
+      rankTxtBtn.setText(tx.rankingFailed).setStyle({ color: '#888', fontSize: '14px' });
+    }
+  }
 
     submitDom.addEventListener('click', doSubmit);
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSubmit(); });
