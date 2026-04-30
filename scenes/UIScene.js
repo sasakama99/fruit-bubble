@@ -77,9 +77,8 @@ class UIScene extends Phaser.Scene {
     this.soundLabel = sound.txt;
     this.soundBox   = sound.box;
 
-    // ── 下段：設定（y=74、ポーズ・音量の中央寄せ）
-    const settings = _iconBtn(437, 74, '⚙', '18px', () => this._showSettings());
-    this.settingsBtnText = settings.txt;
+    // ── 下段：設定（ポーズ・音量の下、小ボタン）
+    this.settingsBtnText = _btn(415, '⚙', () => this._showSettings());
 
     if (!this.soundOn) {
       this.soundLabel.setText('✕');
