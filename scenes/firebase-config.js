@@ -51,37 +51,25 @@ window.RankingAPI = {
     return `${y}-W${String(week).padStart(2, '0')}`;
   },
 
-  // スコアを送信（同名は自己ベストのみ1エントリ保持）
+  // スコアを送信（Top10 に入れるなら push、同名複数エントリOK）
   async submit(period, name, score) {
     if (!window.FB_READY) return false;
-    const key = this._key(period);
-    const ref = window.FB_DB.ref(`fruit-bubble/${period}/${key}`);
+    const key  = this._key(period);
+    const ref  = window.FB_DB.ref(`fruit-bubble/${period}/${key}`);
 
-    // ── ① 同じ名前の既存エントリを取得
-    const nameSnap = await ref.orderByChild('name').equalTo(name).once('value');
-    const myEntries = [];
-    nameSnap.forEach(c => myEntries.push({ key: c.key, ...c.val() }));
-
-    if (myEntries.length > 0) {
-      const bestExisting = Math.max(...myEntries.map(e => e.score));
-      if (score <= bestExisting) return false; // 自己ベスト未更新 → スキップ
-      // 自己ベスト更新 → 古いエントリを全削除
-      await Promise.all(myEntries.map(e => ref.child(e.key).remove()));
-    }
-
-    // ── ② 自分のエントリを除いた Top10 を再取得
-    const snap = await ref.orderByChild('score').limitToLast(10).once('value');
+    // 現在の Top10 を確認
+    const snap   = await ref.orderByChild('score').limitToLast(10).once('value');
     const entries = [];
     snap.forEach(c => entries.push({ key: c.key, ...c.val() }));
 
-    // Top10 に入れる順位かチェック
+    // Top10 未満 or 最下位より高ければ push
     const minScore = entries.length < 10 ? -1 : Math.min(...entries.map(e => e.score));
     if (score <= minScore) return false;
 
-    // ── ③ 新エントリを push
+    // push
     await ref.push({ name: name.slice(0, 8), score, ts: Date.now() });
 
-    // 11件以上になったら最低スコアのエントリを削除
+    // 11件以上になったら最小スコアのエントリを削除
     if (entries.length >= 10) {
       const worst = entries.reduce((a, b) => a.score < b.score ? a : b);
       await ref.child(worst.key).remove();
