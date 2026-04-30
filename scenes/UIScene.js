@@ -68,10 +68,21 @@ class UIScene extends Phaser.Scene {
 
     this.nextImg = this.add.image(327, 57, 'fruit_1').setOrigin(0.5).setScale(0.65);
 
-    // ── 右端縦並び：音量(上) → ポーズ(中) → 設定(下)
-    this.soundLabel      = _rBtn(453,  8, '♪', () => this._toggleSound());
-    this.pauseLabel      = _rBtn(453, 41, '||', () => this._togglePause());
+    // ── 下段：音量（小・左）＋ 設定（小・右）
+    this.soundLabel      = _rBtn(421, 74, '♪', () => this._toggleSound());
     this.settingsBtnText = _rBtn(453, 74, '⚙', () => this._showSettings());
+
+    // ── 上段：一時停止（大・音量と設定の中央上）
+    const pauseX = 450, pauseY = 30;
+    const _pauseBox = this.add.rectangle(pauseX, pauseY, 40, 40, 0xFF4081, 1)
+      .setStrokeStyle(2, 0xC2185B).setInteractive({ cursor: 'pointer' }).setOrigin(0.5);
+    this.pauseLabel = this.add.text(pauseX, pauseY, '||', {
+      fontSize: '17px', fontFamily: 'Arial', color: '#fff',
+      stroke: '#9C0042', strokeThickness: 2,
+    }).setOrigin(0.5);
+    _pauseBox.on('pointerover', () => _pauseBox.setFillStyle(0xFF80AB));
+    _pauseBox.on('pointerout',  () => _pauseBox.setFillStyle(0xFF4081));
+    _pauseBox.on('pointerdown', () => this._togglePause());
 
     if (!this.soundOn) {
       this.soundLabel.setText('✕');
