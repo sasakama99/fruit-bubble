@@ -35,6 +35,13 @@ class GameOverScene extends Phaser.Scene {
 
     this.time.delayedCall(200, () => this._buildUI(currentRank, panel, tx));
     this._nameInput = null; // DOM input の参照を保持
+
+    // ── インタースティシャル広告（ゲームオーバー画面表示時）
+    this.time.delayedCall(500, () => {
+      if (typeof sdk !== 'undefined' && sdk.showInterstitial) {
+        sdk.showInterstitial();
+      }
+    });
   }
 
   _buildUI(rank, panel, tx) {
@@ -171,7 +178,11 @@ class GameOverScene extends Phaser.Scene {
           // Phaser のシーンライフサイクル競合を完全に回避するため
           // ページリロードで確実に再スタートする。
           // ベストスコアは localStorage に保存済みなので消えない。
-          window.location.reload();
+          if (typeof sdk !== 'undefined' && sdk.showInterstitial) {
+            sdk.showInterstitial(() => window.location.reload());
+          } else {
+            window.location.reload();
+          }
         }
       });
     });

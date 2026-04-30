@@ -1,7 +1,7 @@
 // ============================================================
 //  言語設定（JA / EN）
 // ============================================================
-window.LANG = localStorage.getItem('fruitBubbleLang') || 'ja';
+window.LANG = localStorage.getItem('fruitBubbleLang') || 'en';
 
 window.T = {
   ja: {
