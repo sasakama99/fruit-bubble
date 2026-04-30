@@ -642,11 +642,16 @@ class UIScene extends Phaser.Scene {
       inp.select();
 
       const doSave = () => {
+        const oldName = localStorage.getItem('fruitBubblePlayerName') || '';
         const newName = (inp.value || '').trim();
         if (newName) {
           localStorage.setItem('fruitBubblePlayerName', newName);
           nameTxt.setText(`👤 名前変更（${newName}）`);
           _showDone(`「${newName}」で保存しました`);
+          // ランキング内の旧名も更新
+          if (window.RankingAPI && oldName && oldName !== newName) {
+            window.RankingAPI.renamePlayer(oldName, newName);
+          }
         } else {
           localStorage.removeItem('fruitBubblePlayerName');
           nameTxt.setText('👤 プレイヤー名を設定');

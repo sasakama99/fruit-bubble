@@ -106,4 +106,22 @@ window.RankingAPI = {
     if (entries.length < 10) return true;
     return score > Math.min(...entries);
   },
+
+  // ランキング内の旧名を新名に一括更新（設定での名前変更時に呼ぶ）
+  async renamePlayer(oldName, newName) {
+    if (!window.FB_READY || !oldName || !newName || oldName === newName) return;
+    const periods = ['daily', 'weekly', 'monthly'];
+    const updates = [];
+    for (const period of periods) {
+      const key = this._key(period);
+      const ref = window.FB_DB.ref(`fruit-bubble/${period}/${key}`);
+      const snap = await ref.once('value');
+      snap.forEach(child => {
+        if (child.val().name === oldName) {
+          updates.push(ref.child(child.key).update({ name: newName.slice(0, 8) }));
+        }
+      });
+    }
+    await Promise.all(updates);
+  },
 };

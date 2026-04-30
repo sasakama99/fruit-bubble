@@ -88,9 +88,11 @@ class RankingScene extends Phaser.Scene {
   _showLoading() {
     const tx = window.t();
     this._listContainer.removeAll(true);
-    this.add.text(480/2, this._listY + this._listH/2, tx.rankingLoading, {
+    // ← container に追加することで _loadRanking 時に確実に削除される
+    const t = this.add.text(480/2, this._listY + this._listH/2, tx.rankingLoading, {
       fontSize: '16px', fontFamily: 'Arial', color: '#999',
     }).setOrigin(0.5).setDepth(3);
+    this._listContainer.add(t);
   }
 
   async _loadRanking(period) {
