@@ -571,6 +571,12 @@ class UIScene extends Phaser.Scene {
     });
 
     // ── プレイヤー名変更ボタン
+    let _nameInp = null, _nameSaveBtn = null;  // DOM要素の参照（パネル閉鎖時に削除用）
+    const _removeNameDom = () => {
+      if (_nameInp)     { _nameInp.remove();     _nameInp = null; }
+      if (_nameSaveBtn) { _nameSaveBtn.remove();  _nameSaveBtn = null; }
+    };
+
     const savedName = localStorage.getItem('fruitBubblePlayerName') || '';
     const nameLabel = savedName ? `👤 名前変更（${savedName}）` : '👤 プレイヤー名を設定';
     const nameBtn = this.add.rectangle(cx, cy + 98, 240, 46, 0xE8F4FD, 1)
@@ -582,6 +588,7 @@ class UIScene extends Phaser.Scene {
     nameBtn.on('pointerover', () => nameBtn.setFillStyle(0xBBDEFB));
     nameBtn.on('pointerout',  () => nameBtn.setFillStyle(0xE8F4FD));
     nameBtn.on('pointerdown', () => {
+      if (_nameInp) return;  // 既に表示中なら無視
       // DOM input で名前入力
       const canvas = this.game.canvas;
       const rect   = canvas.getBoundingClientRect();
@@ -628,6 +635,8 @@ class UIScene extends Phaser.Scene {
 
       document.body.appendChild(inp);
       document.body.appendChild(saveBtn);
+      _nameInp = inp;
+      _nameSaveBtn = saveBtn;
       nameBtn.disableInteractive();
       inp.focus();
       inp.select();
@@ -643,8 +652,7 @@ class UIScene extends Phaser.Scene {
           nameTxt.setText('👤 プレイヤー名を設定');
           _showDone('プレイヤー名を削除しました');
         }
-        inp.remove();
-        saveBtn.remove();
+        _removeNameDom();
         nameBtn.setInteractive({ cursor: 'pointer' });
       };
       saveBtn.addEventListener('click', doSave);
@@ -666,6 +674,7 @@ class UIScene extends Phaser.Scene {
                      nameBtn, nameTxt, closeBtn, closeTxt];
 
     const _close = () => {
+      _removeNameDom();  // DOM入力欄が残っていれば削除
       this.tweens.add({
         targets: allObjs, alpha: 0, duration: 200,
         onComplete: () => {
