@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>フルーツバブル</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -20,27 +23,22 @@
 <body>
   <div id="game-container"></div>
 
-  <!-- GameMonetize SDK（登録後に取得した Game ID を YOUR_GAME_ID に入れる） -->
+  <!-- GameMonetize SDK -->
   <script>
     window.SDK_OPTIONS = {
       gameId: 'bq5jxgqtpkntz3g87gc4h1qmd0vcsqza',
       onEvent: function(event) {
         switch (event.name) {
           case 'SDK_GAME_PAUSE':
-            // 広告再生中：BGM をミュート＆ゲームを一時停止
-            if (window._gdGame) {
-              window._gdGame.sound.setMute(true);
-            }
+            if (window._gdGame) { window._gdGame.sound.setMute(true); }
             break;
           case 'SDK_GAME_START':
-            // 広告終了後：ミュート解除
             if (window._gdGame) {
               var soundOn = localStorage.getItem('fruitBubbleSound') !== 'off';
               window._gdGame.sound.setMute(!soundOn);
             }
             break;
           case 'SDK_READY':
-            // SDK準備完了
             break;
         }
       },
