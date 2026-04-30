@@ -382,8 +382,8 @@ class GameOverScene extends Phaser.Scene {
         periods.map(p => window.RankingAPI.submit(p, name, score))
       );
 
-      const anyOk           = results.some(r => r && r.ok);
-      const pbResult        = results.find(r => r && r.reason === 'personalBest');
+      const anyOk      = results.some(r => r && r.ok);
+      const limitResult = results.find(r => r && r.reason === 'limitReached');
 
       if (anyOk) {
         // 登録成功
@@ -394,10 +394,10 @@ class GameOverScene extends Phaser.Scene {
           if (!this.scene || !this.scene.isActive('GameOverScene')) return;
           this.scene.launch('RankingScene', { myScore: score, period: 'daily' });
         });
-      } else if (pbResult) {
-        // 自己ベスト未達
+      } else if (limitResult) {
+        // 3エントリ上限 & 自己最低を超えなかった
         rankBtn.setFillStyle(0xFF8F00);
-        rankTxtBtn.setText(`🏅 自己ベスト: ${pbResult.personalBest.toLocaleString()} pt`)
+        rankTxtBtn.setText(`🏅 ベスト: ${limitResult.myBest.toLocaleString()} pt`)
           .setStyle({ color: '#fff', fontSize: '12px' });
       } else {
         // Top10 圏外

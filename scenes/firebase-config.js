@@ -51,31 +51,35 @@ window.RankingAPI = {
     return `${y}-W${String(week).padStart(2, '0')}`;
   },
 
-  // スコアを送信（プレイヤー1人＝自己ベスト1エントリ）
-  // 戻り値: { ok: bool, reason?: 'personalBest'|'outOfTop10', personalBest?: number }
+  // スコアを送信（1人最大3エントリまで、Top10チェックあり）
+  // 戻り値: { ok: bool, reason?: 'limitReached'|'outOfTop10', myBest?: number }
   async submit(period, name, score) {
     if (!window.FB_READY) return { ok: false };
     const key = this._key(period);
     const ref = window.FB_DB.ref(`fruit-bubble/${period}/${key}`);
+    const MAX_PER_PLAYER = 3;
 
-    // ── 同名の既存エントリを取得
-    const nameSnap = await ref.orderByChild('name').equalTo(name).once('value');
-    const myEntries = [];
-    nameSnap.forEach(c => myEntries.push({ key: c.key, ...c.val() }));
-
-    if (myEntries.length > 0) {
-      const best = Math.max(...myEntries.map(e => e.score));
-      if (score <= best) {
-        return { ok: false, reason: 'personalBest', personalBest: best };
-      }
-      // 自己ベスト更新 → 古いエントリを削除
-      await Promise.all(myEntries.map(e => ref.child(e.key).remove()));
-    }
-
-    // ── 自分のエントリを除いた Top10 を取得
+    // ── Top10 を取得
     const snap = await ref.orderByChild('score').limitToLast(10).once('value');
     const entries = [];
     snap.forEach(c => entries.push({ key: c.key, ...c.val() }));
+
+    // ── 自分のエントリを抽出
+    const myEntries = entries.filter(e => e.name === name);
+
+    if (myEntries.length >= MAX_PER_PLAYER) {
+      // 上限到達 → 自分の最低スコアを超えないと登録不可
+      const myWorst  = myEntries.reduce((a, b) => a.score < b.score ? a : b);
+      const myBest   = Math.max(...myEntries.map(e => e.score));
+      if (score <= myWorst.score) {
+        return { ok: false, reason: 'limitReached', myBest };
+      }
+      // 自分の最低エントリを削除して入れ替え
+      await ref.child(myWorst.key).remove();
+      entries.splice(entries.findIndex(e => e.key === myWorst.key), 1);
+    }
+
+    // ── Top10 圏内かチェック
     const minScore = entries.length < 10 ? -1 : Math.min(...entries.map(e => e.score));
     if (score <= minScore) return { ok: false, reason: 'outOfTop10' };
 
