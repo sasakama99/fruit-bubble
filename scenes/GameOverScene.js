@@ -232,46 +232,78 @@ class GameOverScene extends Phaser.Scene {
 
   // ── ランキング登録ブロック ─────────────────────────────────
   _buildRankingBlock(tx, panel) {
-    if (!window.FB_READY) return;  // Firebase 未設定なら非表示
+    if (!window.FB_READY) return;
 
     const score = this.finalScore;
     if (score <= 0) return;
 
     const PERIODS = ['daily', 'weekly', 'monthly'];
     const rankY   = 398;
-    const savedName = localStorage.getItem('fruitBubblePlayerName') || '';
-    const btnLabel = savedName
-      ? `🏆 ${savedName} で登録！`
-      : tx.rankingRegister;
 
-    // ランキングボタン
-    const rankBtn = this.add.rectangle(240, rankY, 280, 38, 0x7B1FA2, 1)
+    // ── メイン登録ボタン（左寄せ）
+    const rankBtn = this.add.rectangle(215, rankY, 222, 38, 0x7B1FA2, 1)
       .setStrokeStyle(2, 0x4A0072).setDepth(2).setAlpha(0).setInteractive({ cursor: 'pointer' });
-    const rankTxtBtn = this.add.text(240, rankY, btnLabel, {
-      fontSize: '15px', fontFamily: 'Arial', fontStyle: 'bold',
+    const rankTxtBtn = this.add.text(215, rankY, '', {
+      fontSize: '14px', fontFamily: 'Arial', fontStyle: 'bold',
       color: '#fff', stroke: '#4A0072', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(3).setAlpha(0);
-    this.tweens.add({ targets: [rankBtn, rankTxtBtn], alpha: 1, duration: 300, delay: 520 });
+
+    // ── ✏ 名前変更ボタン（右小ボタン）
+    const editBtn = this.add.rectangle(352, rankY, 44, 38, 0xCE93D8, 1)
+      .setStrokeStyle(2, 0x9C27B0).setDepth(2).setAlpha(0);
+    const editTxt = this.add.text(352, rankY, '✏', {
+      fontSize: '16px', fontFamily: 'Arial', color: '#fff',
+    }).setOrigin(0.5).setDepth(3).setAlpha(0);
+
+    // ラベルを localStorage から最新の値で更新
+    const refreshLabel = () => {
+      const n = localStorage.getItem('fruitBubblePlayerName') || '';
+      rankTxtBtn.setText(n ? `🏆 ${n} で登録！` : tx.rankingRegister);
+      if (n) {
+        editBtn.setInteractive({ cursor: 'pointer' });
+        editBtn.setFillStyle(0xCE93D8);
+      } else {
+        editBtn.disableInteractive();
+        editBtn.setFillStyle(0xDDBBEE);
+      }
+    };
+    refreshLabel();
+
+    this.tweens.add({
+      targets: [rankBtn, rankTxtBtn, editBtn, editTxt],
+      alpha: 1, duration: 300, delay: 520,
+    });
 
     rankBtn.on('pointerover', () => rankBtn.setFillStyle(0x9C27B0));
     rankBtn.on('pointerout',  () => rankBtn.setFillStyle(0x7B1FA2));
     rankBtn.on('pointerdown', () => {
       rankBtn.disableInteractive();
+      editBtn.disableInteractive();
+      refreshLabel(); // クリック時に最新ラベルへ更新
       const savedName = localStorage.getItem('fruitBubblePlayerName') || '';
       if (savedName) {
-        // 名前が保存済み → 即登録
         this._doRegister(rankBtn, rankTxtBtn, tx, score, PERIODS, savedName);
       } else {
-        // 初回のみ名前入力
-        this._showNameInput(rankBtn, rankTxtBtn, tx, score, PERIODS);
+        this._showNameInput(rankBtn, rankTxtBtn, editBtn, tx, score, PERIODS, '', refreshLabel);
       }
+    });
+
+    editBtn.on('pointerover', () => editBtn.setFillStyle(0xAB47BC));
+    editBtn.on('pointerout',  () => editBtn.setFillStyle(0xCE93D8));
+    editBtn.on('pointerdown', () => {
+      rankBtn.disableInteractive();
+      editBtn.disableInteractive();
+      const savedName = localStorage.getItem('fruitBubblePlayerName') || '';
+      this._showNameInput(rankBtn, rankTxtBtn, editBtn, tx, score, PERIODS, savedName, refreshLabel);
     });
   }
 
-  _showNameInput(rankBtn, rankTxtBtn, tx, score, periods) {
+  // prefilledName: 名前変更モード時に現在の名前を渡す（空文字は新規入力）
+  _showNameInput(rankBtn, rankTxtBtn, editBtn, tx, score, periods, prefilledName, refreshLabel) {
     this._removeNameInput();
 
-    rankTxtBtn.setText(tx.rankingNameLabel).setFontSize('13px');
+    const isEdit = !!prefilledName;
+    rankTxtBtn.setText(isEdit ? '✏ 名前を変更...' : tx.rankingNameLabel).setFontSize('13px');
     rankBtn.setFillStyle(0xCE93D8).setStrokeStyle(1, 0x9C27B0);
 
     const canvas  = this.game.canvas;
@@ -283,12 +315,13 @@ class GameOverScene extends Phaser.Scene {
     const inp = document.createElement('input');
     inp.type        = 'text';
     inp.maxLength   = 8;
+    inp.value       = prefilledName;
     inp.placeholder = tx.rankingNamePlaceholder;
     inp.style.cssText = [
       `position:fixed`,
       `left:${rect.left + 90 * scaleX}px`,
       `top:${rect.top  + (baseY + 22) * scaleY}px`,
-      `width:${185 * scaleX}px`,
+      `width:${170 * scaleX}px`,
       `height:${34 * scaleY}px`,
       `font-size:${16 * Math.min(scaleX, scaleY)}px`,
       `border:2px solid #CE93D8`,
@@ -300,14 +333,14 @@ class GameOverScene extends Phaser.Scene {
     ].join(';');
 
     const submitDom = document.createElement('button');
-    submitDom.textContent = tx.rankingNameBtn;
+    submitDom.textContent = isEdit ? '変更して登録' : tx.rankingNameBtn;
     submitDom.style.cssText = [
       `position:fixed`,
-      `left:${rect.left + 285 * scaleX}px`,
+      `left:${rect.left + 268 * scaleX}px`,
       `top:${rect.top  + (baseY + 22) * scaleY}px`,
-      `width:${80 * scaleX}px`,
+      `width:${96 * scaleX}px`,
       `height:${34 * scaleY}px`,
-      `font-size:${14 * Math.min(scaleX, scaleY)}px`,
+      `font-size:${13 * Math.min(scaleX, scaleY)}px`,
       `background:#7B1FA2`,
       `color:#fff`,
       `border:none`,
@@ -322,13 +355,19 @@ class GameOverScene extends Phaser.Scene {
     this._nameInput = inp;
     this._submitDom = submitDom;
     inp.focus();
+    if (isEdit) inp.select(); // 変更モードは全選択
 
     const doSubmit = () => {
       const name = (inp.value || '').trim();
       if (!name) { inp.focus(); return; }
       submitDom.disabled = true;
+      const oldName = localStorage.getItem('fruitBubblePlayerName') || '';
       this._removeNameInput();
-      localStorage.setItem('fruitBubblePlayerName', name); // 名前を保存
+      localStorage.setItem('fruitBubblePlayerName', name);
+      // 名前が変わっていたらランキングの既存エントリも更新
+      if (oldName && oldName !== name && window.RankingAPI && window.RankingAPI.renamePlayer) {
+        window.RankingAPI.renamePlayer(oldName, name);
+      }
       this._doRegister(rankBtn, rankTxtBtn, tx, score, periods, name);
     };
 
