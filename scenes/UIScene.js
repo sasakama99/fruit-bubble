@@ -43,18 +43,18 @@ class UIScene extends Phaser.Scene {
     this.helpBtnText     = _btn(162, tx.helpBtn,     () => this._showHelp());
     // 設定ボタンは右端ブロック（下段）に移動
 
-    // ── 右端ボタン共通（ポーズ・音量・設定）
-    const _iconBtn = (x, y, label, fontSize, onDown) => {
-      const box = this.add.rectangle(x, y, 40, 40, 0xFF4081, 1)
-        .setStrokeStyle(2, 0xC2185B).setInteractive({ cursor: 'pointer' }).setOrigin(0.5);
-      const txt = this.add.text(x, y, label, {
-        fontSize, fontFamily: 'Arial', color: '#fff',
-        stroke: '#9C0042', strokeThickness: 2,
-      }).setOrigin(0.5);
-      box.on('pointerover', () => box.setFillStyle(0xFF80AB));
-      box.on('pointerout',  () => box.setFillStyle(0xFF4081));
-      box.on('pointerdown', onDown);
-      return { box, txt };
+    // ── 右端小ボタン（y を指定できる版）
+    const _rBtn = (x, y, label, onClick) => {
+      const b = this.add.text(x, y, label, {
+        fontSize: '15px', fontFamily: 'Arial',
+        color: '#fff', stroke: '#C0006A', strokeThickness: 2,
+        backgroundColor: '#F06292',
+        padding: { x: 7, y: 4 },
+      }).setInteractive({ cursor: 'pointer' });
+      b.on('pointerover', () => b.setStyle({ backgroundColor: '#FF80AB' }));
+      b.on('pointerout',  () => b.setStyle({ backgroundColor: '#F06292' }));
+      b.on('pointerdown', onClick);
+      return b;
     };
 
     // ── NEXT エリア（x=327 中心）
@@ -68,17 +68,10 @@ class UIScene extends Phaser.Scene {
 
     this.nextImg = this.add.image(327, 57, 'fruit_1').setOrigin(0.5).setScale(0.65);
 
-    // ── 上段：ポーズ・音量（y=28）
-    const pause = _iconBtn(415, 28, '||', '17px', () => this._togglePause());
-    this.pauseLabel = pause.txt;
-    this.pauseBox   = pause.box;
-
-    const sound = _iconBtn(460, 28, '♪', '20px', () => this._toggleSound());
-    this.soundLabel = sound.txt;
-    this.soundBox   = sound.box;
-
-    // ── 下段：設定（音量ボタンの下）
-    this.settingsBtnText = _btn(443, '⚙', () => this._showSettings());
+    // ── 右端縦並び：音量(上) → ポーズ(中) → 設定(下)
+    this.soundLabel      = _rBtn(453,  8, '♪', () => this._toggleSound());
+    this.pauseLabel      = _rBtn(453, 41, '||', () => this._togglePause());
+    this.settingsBtnText = _rBtn(453, 74, '⚙', () => this._showSettings());
 
     if (!this.soundOn) {
       this.soundLabel.setText('✕');
