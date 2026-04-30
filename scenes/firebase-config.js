@@ -51,30 +51,41 @@ window.RankingAPI = {
     return `${y}-W${String(week).padStart(2, '0')}`;
   },
 
-  // スコアを送信（Top10 に入れるなら push、同名複数エントリOK）
+  // スコアを送信（プレイヤー1人＝自己ベスト1エントリ）
+  // 戻り値: { ok: bool, reason?: 'personalBest'|'outOfTop10', personalBest?: number }
   async submit(period, name, score) {
-    if (!window.FB_READY) return false;
-    const key  = this._key(period);
-    const ref  = window.FB_DB.ref(`fruit-bubble/${period}/${key}`);
+    if (!window.FB_READY) return { ok: false };
+    const key = this._key(period);
+    const ref = window.FB_DB.ref(`fruit-bubble/${period}/${key}`);
 
-    // 現在の Top10 を確認
-    const snap   = await ref.orderByChild('score').limitToLast(10).once('value');
+    // ── 同名の既存エントリを取得
+    const nameSnap = await ref.orderByChild('name').equalTo(name).once('value');
+    const myEntries = [];
+    nameSnap.forEach(c => myEntries.push({ key: c.key, ...c.val() }));
+
+    if (myEntries.length > 0) {
+      const best = Math.max(...myEntries.map(e => e.score));
+      if (score <= best) {
+        return { ok: false, reason: 'personalBest', personalBest: best };
+      }
+      // 自己ベスト更新 → 古いエントリを削除
+      await Promise.all(myEntries.map(e => ref.child(e.key).remove()));
+    }
+
+    // ── 自分のエントリを除いた Top10 を取得
+    const snap = await ref.orderByChild('score').limitToLast(10).once('value');
     const entries = [];
     snap.forEach(c => entries.push({ key: c.key, ...c.val() }));
-
-    // Top10 未満 or 最下位より高ければ push
     const minScore = entries.length < 10 ? -1 : Math.min(...entries.map(e => e.score));
-    if (score <= minScore) return false;
+    if (score <= minScore) return { ok: false, reason: 'outOfTop10' };
 
-    // push
     await ref.push({ name: name.slice(0, 8), score, ts: Date.now() });
 
-    // 11件以上になったら最小スコアのエントリを削除
     if (entries.length >= 10) {
       const worst = entries.reduce((a, b) => a.score < b.score ? a : b);
       await ref.child(worst.key).remove();
     }
-    return true;
+    return { ok: true };
   },
 
   // Top10 取得 → [{rank, name, score, ts, isYou}] を返す

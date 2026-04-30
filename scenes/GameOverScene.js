@@ -378,20 +378,35 @@ class GameOverScene extends Phaser.Scene {
   async _doRegister(rankBtn, rankTxtBtn, tx, score, periods, name) {
     rankTxtBtn.setText('⏳ 送信中...').setFontSize('14px');
     try {
-        const results = await Promise.all(
-          periods.map(p => window.RankingAPI.submit(p, name, score))
-        );
-        const ok = results.some(r => r);
-        rankBtn.setFillStyle(ok ? 0x4CAF50 : 0xBDBDBD);
-        rankTxtBtn.setText(ok ? tx.rankingRegistered : '圏外でした')
-          .setStyle({ color: ok ? '#fff' : '#888', fontSize: '14px' });
-        if (ok) {
-          this.time.delayedCall(1000, () => {
-            if (!this.scene || !this.scene.isActive('GameOverScene')) return;
-            this.scene.launch('RankingScene', { myScore: score, period: 'daily' });
-          });
-        }
+      const results = await Promise.all(
+        periods.map(p => window.RankingAPI.submit(p, name, score))
+      );
+
+      const anyOk           = results.some(r => r && r.ok);
+      const pbResult        = results.find(r => r && r.reason === 'personalBest');
+
+      if (anyOk) {
+        // 登録成功
+        rankBtn.setFillStyle(0x4CAF50);
+        rankTxtBtn.setText(tx.rankingRegistered)
+          .setStyle({ color: '#fff', fontSize: '14px' });
+        this.time.delayedCall(1000, () => {
+          if (!this.scene || !this.scene.isActive('GameOverScene')) return;
+          this.scene.launch('RankingScene', { myScore: score, period: 'daily' });
+        });
+      } else if (pbResult) {
+        // 自己ベスト未達
+        rankBtn.setFillStyle(0xFF8F00);
+        rankTxtBtn.setText(`🏅 自己ベスト: ${pbResult.personalBest.toLocaleString()} pt`)
+          .setStyle({ color: '#fff', fontSize: '12px' });
+      } else {
+        // Top10 圏外
+        rankBtn.setFillStyle(0xBDBDBD);
+        rankTxtBtn.setText('圏外でした')
+          .setStyle({ color: '#888', fontSize: '14px' });
+      }
     } catch (e) {
+      console.error('_doRegister error', e);
       rankBtn.setFillStyle(0xBDBDBD);
       rankTxtBtn.setText(tx.rankingFailed).setStyle({ color: '#888', fontSize: '14px' });
     }
