@@ -41,9 +41,9 @@ class UIScene extends Phaser.Scene {
     this.badgeBtnText    = _btn( 96, tx.badgeBtn,    () => this._showBadgePanel());
     this.rankingBtnText  = _btn(130, tx.rankingBtn,  () => this._showRanking());
     this.helpBtnText     = _btn(162, tx.helpBtn,     () => this._showHelp());
-    this.settingsBtnText = _btn(196, tx.settingsBtn, () => this._showSettings());
+    // 設定ボタンは右端ブロック（下段）に移動
 
-    // ── ポーズ・音量ボタン（横並び・右端）
+    // ── 右端ボタン共通（ポーズ・音量・設定）
     const _iconBtn = (x, y, label, fontSize, onDown) => {
       const box = this.add.rectangle(x, y, 40, 40, 0xFF4081, 1)
         .setStrokeStyle(2, 0xC2185B).setInteractive({ cursor: 'pointer' }).setOrigin(0.5);
@@ -57,7 +57,7 @@ class UIScene extends Phaser.Scene {
       return { box, txt };
     };
 
-    // ── NEXT エリア（排出フルーツx=240 と 一時停止x=415 の中間 = x=327）
+    // ── NEXT エリア（x=327 中心）
     this.add.rectangle(327, 50, 74, 88, 0xFFB3D9, 0.45)
       .setStrokeStyle(2, 0xFF6BAE).setOrigin(0.5);
 
@@ -68,14 +68,18 @@ class UIScene extends Phaser.Scene {
 
     this.nextImg = this.add.image(327, 57, 'fruit_1').setOrigin(0.5).setScale(0.65);
 
-    // ── ポーズ・音量ボタン（横並び・右端）
-    const pause = _iconBtn(415, 50, '||', '17px', () => this._togglePause());
+    // ── 上段：ポーズ・音量（y=28）
+    const pause = _iconBtn(415, 28, '||', '17px', () => this._togglePause());
     this.pauseLabel = pause.txt;
     this.pauseBox   = pause.box;
 
-    const sound = _iconBtn(460, 50, '♪', '20px', () => this._toggleSound());
+    const sound = _iconBtn(460, 28, '♪', '20px', () => this._toggleSound());
     this.soundLabel = sound.txt;
     this.soundBox   = sound.box;
+
+    // ── 下段：設定（y=74、ポーズ・音量の中央寄せ）
+    const settings = _iconBtn(437, 74, '⚙', '18px', () => this._showSettings());
+    this.settingsBtnText = settings.txt;
 
     if (!this.soundOn) {
       this.soundLabel.setText('✕');

@@ -1,7 +1,5 @@
 // ============================================================
 //  Firebase 設定
-//  firebase.google.com でプロジェクトを作成し、
-//  Realtime Database を有効化した後、下記の値を書き換えてください。
 // ============================================================
 
 window.FB_CONFIG = {
@@ -44,13 +42,12 @@ window.RankingAPI = {
     const d   = String(now.getDate()).padStart(2, '0');
     if (period === 'daily')   return `${y}-${m}-${d}`;
     if (period === 'monthly') return `${y}-${m}`;
-    // weekly: ISO week number
-    const jan4  = new Date(y, 0, 4);
-    const week  = Math.ceil(((now - jan4) / 86400000 + jan4.getDay() + 1) / 7);
+    const jan4 = new Date(y, 0, 4);
+    const week = Math.ceil(((now - jan4) / 86400000 + jan4.getDay() + 1) / 7);
     return `${y}-W${String(week).padStart(2, '0')}`;
   },
 
-  // 全エントリを取得してスコア降順で返す（インデックス不要）
+  // 全エントリをスコア降順で返す（インデックス不要）
   async _fetchAll(ref) {
     const snap = await ref.once('value');
     const all  = [];
@@ -60,58 +57,68 @@ window.RankingAPI = {
   },
 
   // スコアを送信（1人最大3エントリまで、Top10チェックあり）
+  // ref.update() でアトミックに削除＋追加するため競合なし
   // 戻り値: { ok: bool, reason?: 'limitReached'|'outOfTop10', myBest?: number }
   async submit(period, name, score) {
     if (!window.FB_READY) return { ok: false };
     const key = this._key(period);
     const ref = window.FB_DB.ref(`fruit-bubble/${period}/${key}`);
     const MAX_PER_PLAYER = 3;
+    const MAX_TOTAL      = 10;
 
-    // 全エントリ取得（クライアント側でソート済み）
-    const all = await this._fetchAll(ref);
-
-    // 自分のエントリを抽出
+    // 全エントリ取得（スコア降順）
+    const all       = await this._fetchAll(ref);
     const myEntries = all.filter(e => e.name === name);
 
+    // 自分のエントリが上限以上か確認
     if (myEntries.length >= MAX_PER_PLAYER) {
-      // 上限到達 → 自分の最低スコアを超えないと登録不可
-      const myBest  = myEntries[0].score; // sorted desc なので先頭が最高
-      const myWorst = myEntries[myEntries.length - 1]; // 末尾が最低
-      if (score <= myWorst.score) {
+      const myBest  = myEntries[0].score;
+      const myWorst = myEntries[myEntries.length - 1].score;
+      if (score <= myWorst) {
         return { ok: false, reason: 'limitReached', myBest };
       }
-      // 自分の最低エントリを削除（MAX_PER_PLAYER-1 個になるまで）
+    }
+
+    // Top10 圏内かチェック
+    const top10min = all.length < MAX_TOTAL ? -1 : all[MAX_TOTAL - 1].score;
+    if (score <= top10min) return { ok: false, reason: 'outOfTop10' };
+
+    // ── アトミック更新オブジェクトを構築 ──────────────────────
+    const updates = {};
+
+    // 自分が上限超えなら低スコアから削除して MAX_PER_PLAYER-1 個にする
+    if (myEntries.length >= MAX_PER_PLAYER) {
       const excessCount = myEntries.length - (MAX_PER_PLAYER - 1);
-      const toRemove = myEntries.slice(myEntries.length - excessCount); // 末尾（低スコア）から
+      const toRemove    = myEntries.slice(myEntries.length - excessCount);
       for (const entry of toRemove) {
-        await ref.child(entry.key).remove();
-        const idx = all.findIndex(e => e.key === entry.key);
-        if (idx !== -1) all.splice(idx, 1);
+        updates[entry.key] = null; // null = 削除
       }
     }
 
-    // Top10 圏内かチェック（全エントリ中の順位で判定）
-    const top10min = all.length < 10 ? -1 : all[9].score; // 10番目のスコア
-    if (score <= top10min) return { ok: false, reason: 'outOfTop10' };
-
-    // 登録
-    await ref.push({ name: name.slice(0, 8), score, ts: Date.now() });
-
-    // Top10 を超えていたら最低エントリを削除
-    if (all.length >= 10) {
-      const worst = all[all.length - 1];
-      await ref.child(worst.key).remove();
+    // 全体 Top10 超えなら全体最低スコアを削除
+    // (削除予定エントリを除いた残りで判定)
+    const deletedKeys = Object.keys(updates);
+    const remaining   = all.filter(e => !deletedKeys.includes(e.key));
+    if (remaining.length >= MAX_TOTAL) {
+      const worst = remaining[remaining.length - 1];
+      updates[worst.key] = null;
     }
+
+    // 新エントリを追加（push().key で安全なキー生成）
+    const newKey       = ref.push().key;
+    updates[newKey]    = { name: name.slice(0, 8), score, ts: Date.now() };
+
+    // 一括アトミック更新
+    await ref.update(updates);
     return { ok: true };
   },
 
   // Top10 取得 → [{rank, name, score, ts, isYou}] を返す
   async fetch(period, myScore) {
     if (!window.FB_READY) return null;
-    const key = this._key(period);
-    const ref = window.FB_DB.ref(`fruit-bubble/${period}/${key}`);
-
-    const all  = await this._fetchAll(ref);
+    const key   = this._key(period);
+    const ref   = window.FB_DB.ref(`fruit-bubble/${period}/${key}`);
+    const all   = await this._fetchAll(ref);
     const top10 = all.slice(0, 10);
 
     let marked = false;
@@ -127,27 +134,26 @@ window.RankingAPI = {
     if (!window.FB_READY) return false;
     const key = this._key(period);
     const ref = window.FB_DB.ref(`fruit-bubble/${period}/${key}`);
-
     const all = await this._fetchAll(ref);
     if (all.length < 10) return true;
     return score > all[9].score;
   },
 
-  // ランキング内の旧名を新名に一括更新（設定での名前変更時に呼ぶ）
+  // ランキング内の旧名を新名に一括更新
   async renamePlayer(oldName, newName) {
     if (!window.FB_READY || !oldName || !newName || oldName === newName) return;
     const periods = ['daily', 'weekly', 'monthly'];
-    const updates = [];
+    const promises = [];
     for (const period of periods) {
       const key = this._key(period);
       const ref = window.FB_DB.ref(`fruit-bubble/${period}/${key}`);
       const snap = await ref.once('value');
       snap.forEach(child => {
         if (child.val().name === oldName) {
-          updates.push(ref.child(child.key).update({ name: newName.slice(0, 8) }));
+          promises.push(ref.child(child.key).update({ name: newName.slice(0, 8) }));
         }
       });
     }
-    await Promise.all(updates);
+    await Promise.all(promises);
   },
 };
