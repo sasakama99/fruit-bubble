@@ -578,7 +578,7 @@ class UIScene extends Phaser.Scene {
     };
 
     const savedName = localStorage.getItem('fruitBubblePlayerName') || '';
-    const nameLabel = savedName ? `👤 名前変更（${savedName}）` : '👤 プレイヤー名を設定';
+    const nameLabel = savedName ? `👤 名前変更（${savedName}）` : '👤 未記入（タップで設定）';
     const nameBtn = this.add.rectangle(cx, cy + 98, 240, 46, 0xE8F4FD, 1)
       .setStrokeStyle(2, 0x90CAF9).setInteractive({ cursor: 'pointer' }).setDepth(72);
     const nameTxt = this.add.text(cx, cy + 98, nameLabel, {
@@ -654,7 +654,7 @@ class UIScene extends Phaser.Scene {
           }
         } else {
           localStorage.removeItem('fruitBubblePlayerName');
-          nameTxt.setText('👤 プレイヤー名を設定');
+          nameTxt.setText('👤 未記入（タップで設定）');
           _showDone('プレイヤー名を削除しました');
         }
         _removeNameDom();
