@@ -39,10 +39,6 @@
             }
             break;
           case 'SDK_READY':
-            // ゲームロード完了時にインタースティシャルを表示
-            if (typeof sdk !== 'undefined' && sdk.showInterstitial) {
-              sdk.showInterstitial();
-            }
             break;
         }
       },
@@ -64,9 +60,10 @@
   <script src="scenes/BadgeSystem.js?v=3"></script>
   <script src="scenes/firebase-config.js?v=8"></script>
   <script src="scenes/RankingScene.js?v=2"></script>
+  <script src="scenes/StartScene.js?v=1"></script>
   <script src="scenes/GameScene.js?v=47"></script>
   <script src="scenes/UIScene.js?v=37"></script>
-  <script src="scenes/GameOverScene.js?v=28"></script>
-  <script src="game.js?v=9"></script>
+  <script src="scenes/GameOverScene.js?v=29"></script>
+  <script src="game.js?v=10"></script>
 </body>
 </html>

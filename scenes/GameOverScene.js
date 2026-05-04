@@ -178,11 +178,7 @@ class GameOverScene extends Phaser.Scene {
           // Phaser のシーンライフサイクル競合を完全に回避するため
           // ページリロードで確実に再スタートする。
           // ベストスコアは localStorage に保存済みなので消えない。
-          if (typeof sdk !== 'undefined' && sdk.showInterstitial) {
-            sdk.showInterstitial(() => window.location.reload());
-          } else {
-            window.location.reload();
-          }
+          window.location.reload();
         }
       });
     });
